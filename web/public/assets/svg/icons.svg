@@ -2,6 +2,18 @@
   <symbol id="brand" viewBox="0 0 24 24"><path d="M4 6.5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m9 12 2.2 2.2 4-4"/></symbol>
   <symbol id="files" viewBox="0 0 24 24"><path d="M15 2H7a2 2 0 0 0-2 2v13m10-15 4 4v12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6m0-2v4h4M3 9v11a2 2 0 0 0 2 2h9"/></symbol>
   <symbol id="file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6M8 13h8m-8 4h5"/></symbol>
+  <symbol id="file-pdf" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="M8 18.4c1.5-1.8 2.8-4.5 3.3-6.7.2-.9 1-.9 1.2 0 .5 2.2 1.9 4.9 3.5 6.7m-6.4-2.2h4.7"/></symbol>
+  <symbol id="file-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="m8 12 1.4 5.5 2.6-4.4 2.6 4.4L16 12"/></symbol>
+  <symbol id="file-sheet" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><rect x="8" y="11" width="8" height="7.5" rx="1"/><path d="M8 14.75h8M12 11v7.5"/></symbol>
+  <symbol id="file-slides" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><rect x="7.5" y="11" width="9" height="6" rx="1"/><path d="M12 17v2.5m-1.6-5.5h3.2"/></symbol>
+  <symbol id="file-image" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="M7.5 18.5 11 14l2 2.4 1.6-2 2.4 4.1H7.5Zm7.5-7.2h.01"/></symbol>
+  <symbol id="file-video" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="m10 11.5 5.5 3.25L10 18Z"/></symbol>
+  <symbol id="file-audio" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="M10.5 17v-5.2l5-1.3v5.2m-5-2.3 5-1.3"/><ellipse cx="9.25" cy="17.5" rx="1.25" ry="1"/><ellipse cx="14.25" cy="16.2" rx="1.25" ry="1"/></symbol>
+  <symbol id="file-archive" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="M11 5h1.3m-2.6 2.4H11m0 2.4h1.3m-2.6 2.4H11v2.5"/><rect x="9.5" y="14.75" width="3" height="4" rx="1.1"/></symbol>
+  <symbol id="file-code" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="m9 13-2 2.3L9 17.5m6-4.5 2 2.3-2 2.2m-2-6-2 7.5"/></symbol>
+  <symbol id="file-executable" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="m12.9 10.5-4.9 5h3.7l-.6 4 4.9-5.6h-3.7Z"/></symbol>
+  <symbol id="file-data" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><ellipse cx="12" cy="12.5" rx="4" ry="1.5"/><path d="M8 12.5v4.7c0 .9 1.8 1.6 4 1.6s4-.7 4-1.6v-4.7m-8 2.3c0 .9 1.8 1.6 4 1.6s4-.7 4-1.6"/></symbol>
+  <symbol id="file-font" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Zm0 0v6h6"/><path d="m8 18.5 2.3-7 2.3 7M8.8 16h3m2.4-1.7a1.8 1.8 0 0 1 2.8 1.5v2.7m0-2.5h-1.2a1.25 1.25 0 0 0 0 2.5H17"/></symbol>
   <symbol id="folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
   <symbol id="shared" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4m-6.8 7 6.8 4"/></symbol>
   <symbol id="link" viewBox="0 0 24 24"><path d="M10 13a4 4 0 0 0 6 .5l4-4a4 4 0 0 0-6-5.5l-2 2m2 5a4 4 0 0 0-6-.5l-4 4A4 4 0 0 0 10 20l2-2"/></symbol>
@@ -25,7 +37,7 @@
   <symbol id="history" viewBox="0 0 24 24"><path d="M3.3 12a8.7 8.7 0 1 1 2.5 6.1M3 7v5h5m4-5v5l3 2"/></symbol>
   <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></symbol>
   <symbol id="settings" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14M9 4v4m6 2v4m-5 2v4"/></symbol>
-  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5m-11 5v-5h5m-4-1a7 7 0 0 1 12-5l3 3m-1 4a7 7 0 0 1-12 5l-3-3"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 4v5h-5M4 20v-5h5M4 12a8 8 0 0 1 13.7-5.7L20 9M20 12a8 8 0 0 1-13.7 5.7L4 15"/></symbol>
   <symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
   <symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16l-1 13H5Zm4 0V4h8v3m-6 4v5m4-5v5"/></symbol>
   <symbol id="copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>

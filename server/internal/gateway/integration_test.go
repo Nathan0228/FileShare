@@ -81,7 +81,20 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	up := connect()
 	request := up.request(wire.List, wire.ID{}, wire.NoChunk, map[string]string{"scope": "owned"})
 	assertCode(t, request, "UNAUTH")
+	assertCode(t, up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, nil), "UNAUTH")
 	up.attach(ownerToken)
+	self := up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, nil)
+	assertKind(t, self, wire.UserProfileOK)
+	var profile store.UserProfile
+	if err := json.Unmarshal(self.Body, &profile); err != nil {
+		t.Fatal(err)
+	}
+	if profile.Username != owner || profile.UserID != strings.TrimPrefix(owner, "gateway-") ||
+		profile.Role != "user" || profile.Quota != 104857600 || profile.Used != 0 || profile.Reserved != 0 ||
+		strings.Join(profile.Permissions, ",") != "UPLOAD,DOWNLOAD,SHARE" {
+		t.Fatalf("unexpected current user profile: %s", self.Body)
+	}
+	assertCode(t, up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, map[string]string{"username": grantee}), "BAD_REQUEST")
 	assertCode(t, up.request(wire.List, wire.ID{}, wire.NoChunk, map[string]string{"Scope": "owned"}), "BAD_REQUEST")
 	newUser := "new-" + grantee
 	create := map[string]any{"action": "create", "username": newUser}

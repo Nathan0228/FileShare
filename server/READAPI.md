@@ -93,6 +93,7 @@ ff ff ff ff
 | `12 SHARE_SET` | `{fileId,grantee,allow}`，`grantee` 为账号名，`allow` 为布尔值 | `7D OK` |
 | `13 ADMIN` | `{action,...}`，见管理员接口 | `7D OK`，载荷取决于操作 |
 | `14 FILE_DELETE` | `{fileId}` | `7D OK` |
+| `15 USER_PROFILE` | 空 | `16 USER_PROFILE_OK` · `{userId,username,role,permissions,quotaBytes,usedBytes,reservedBytes}` |
 | `20 PUT_BEGIN` | `{opId,name,size,sha256}` | `21 PUT_READY` · `{size,sha256,chunkBytes,state}`，报头返回上传 ID |
 | `22 PUT_DATA` | 分片摘要与数据 | `7D OK`，报头回显上传 ID 和索引 |
 | `23 PUT_STATUS` | 空 | `24 PUT_STATE` · `{state,bitmap,fileId}`，未发布时 `fileId` 为 `null` |
@@ -111,6 +112,10 @@ ff ff ff ff
 - 每条连接最多保留一个待完成挑战，后发挑战替换前一个。挑战绑定连接、用途和用户，120 秒内一次性使用。注册采用 ES256 并要求用户验证。账号最多 8 个有效凭据。
 - `AUTH_OK` 返回用户 ID、`admin` 或 `user` 角色、权限数组和 32 字节随机会话令牌的 base64url 表示。页面把令牌留在内存。掉线重连后先发 `SESSION_ATTACH`，再恢复任务。刷新页面或过期后重新 Passkey 登录。会话绝对有效期 8 小时，业务空闲 30 分钟过期。Ping/Pong 不更新业务空闲期限。
 - `LOGOUT` 撤销当前令牌并释放连接上的传输绑定。客户端收到 OK 后可正常发送 WS Close 1000。更换账号时建立新连接。
+
+### 当前账号资料
+
+登录或恢复会话后可调用 `USER_PROFILE` 获取当前用户名、角色、权限及配额。请求载荷为 0 字节，报头 `TransferID` 填全零，`ChunkIndex` 填 `FFFFFFFF`。身份由当前会话确定。服务端从 MariaDB 读取最新授权、已用字节数和未完成上传的预留字节数。普通用户和管理员均可查询自己的资料。未登录返回 `UNAUTH`，携带载荷或任务编号返回 `BAD_REQUEST`。
 
 ### 文件列表与共享
 

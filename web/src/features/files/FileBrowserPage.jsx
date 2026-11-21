@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import FileIcon from '../../components/FileIcon.jsx'
 import Icon from '../../components/Icon.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Alert, EmptyState } from '../../components/ui/Feedback.jsx'
+import { RefreshButton } from '../../components/ui/RefreshButton.jsx'
 import { getErrorMessage } from '../../services/errors.js'
 import { useSession } from '../auth/session.js'
 import { useToast } from '../feedback/toast.js'
@@ -17,7 +19,7 @@ function FileRow({ file, owned, canDownload, canShare, ready, onDownload, onShar
   return (
     <li className="file-row transition-colors hover:bg-[#f8faf9]">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-mint text-primary"><Icon name="file" size={20} /></span>
+        <FileIcon filename={file.name} />
         <div className="min-w-0">
           <p title={file.name} className="truncate text-sm font-semibold text-ink">{file.name}</p>
           <p className="mt-1 truncate text-xs text-muted sm:hidden">{`${formatBytes(file.size)} · ${file.owner}`}</p>
@@ -117,7 +119,7 @@ export function FileBrowserPage({ scope }) {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted sm:block">{search ? `匹配 ${files.length} 个` : `已加载 ${page.items.length} 个文件`}</span>
-            <Button variant="secondary" size="sm" icon="refresh" className="icon-button" aria-label="刷新列表" title="刷新列表" disabled={!page.ready} onClick={page.refresh} />
+            <RefreshButton size="sm" label="刷新列表" iconOnly disabled={!page.ready} loading={page.loading} onClick={page.refresh} />
           </div>
         </div>
         <div className="file-row file-row-heading border-y border-line" aria-hidden="true">
@@ -126,7 +128,7 @@ export function FileBrowserPage({ scope }) {
         {page.loading && !page.items.length ? (
           <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted"><span className="button-spinner text-primary" />正在获取文件…</div>
         ) : page.error ? (
-          <div className="p-4 sm:p-5"><Alert tone="error" title="无法获取文件" action={<Button size="sm" variant="secondary" onClick={page.refresh}>重试</Button>}>{page.error}</Alert></div>
+          <div className="p-4 sm:p-5"><Alert tone="error" title="无法获取文件" action={<RefreshButton size="sm" label="重试" disabled={!page.ready} loading={page.loading} onClick={page.refresh} />}>{page.error}</Alert></div>
         ) : files.length ? (
           <ul className="divide-y divide-line" aria-label={owned ? '个人文件列表' : '接收文件列表'}>
             {files.map((file) => <FileRow key={file.fileId} file={file} owned={owned} canDownload={canDownload} canShare={canShare} ready={page.ready} onDownload={download} onShare={(entry) => setDialog({ kind: 'share', file: entry })} onDelete={(entry) => setDialog({ kind: 'delete', file: entry })} />)}

@@ -105,6 +105,9 @@ func (c *connection) control(ctx context.Context, m wire.Message, actor auth.Ide
 	ok := m.Reply(wire.OK, nil)
 	user := actor.UserID
 	switch m.Kind {
+	case wire.UserProfile:
+		profile, err := c.gateway.store.Profile(ctx, user)
+		return jsonReply(m, wire.UserProfileOK, profile), err
 	case wire.List:
 		var req struct {
 			Scope  string  `json:"scope"`

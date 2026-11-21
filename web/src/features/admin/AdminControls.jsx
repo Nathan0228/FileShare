@@ -1,6 +1,7 @@
 import Icon from '../../components/Icon.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Alert, EmptyState } from '../../components/ui/Feedback.jsx'
+import { RefreshButton } from '../../components/ui/RefreshButton.jsx'
 
 export function AdminHeader({ title, description, children }) {
   return (
@@ -11,15 +12,6 @@ export function AdminHeader({ title, description, children }) {
       </div>
       <div className="flex max-w-full flex-wrap items-center gap-2">{children}</div>
     </header>
-  )
-}
-
-export function RefreshButton({ onClick, disabled }) {
-  return (
-    <Button variant="secondary" onClick={onClick} disabled={disabled}>
-      <Icon name="refresh" size={16} />
-      刷新
-    </Button>
   )
 }
 
@@ -49,7 +41,7 @@ export function Results({ page, emptyIcon, emptyTitle, emptyDescription, childre
     return (
       <div className="p-4 sm:p-5">
         <Alert tone="error" title="加载失败">{page.error}</Alert>
-        <div className="mt-3"><Button variant="secondary" size="sm" onClick={page.refresh}>重新加载</Button></div>
+        <div className="mt-3"><RefreshButton label="重新加载" size="sm" onClick={page.refresh} /></div>
       </div>
     )
   }

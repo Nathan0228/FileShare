@@ -5,6 +5,7 @@ import ConnectionStatus from '../components/ConnectionStatus.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui/Button.jsx'
 import { Modal } from '../components/ui/Modal.jsx'
+import { AccountPanel } from '../features/auth/AccountPanel.jsx'
 import { useSession } from '../features/auth/session.js'
 import { useToast } from '../features/feedback/toast.js'
 import { useTransfers } from '../features/transfers/index.js'
@@ -25,7 +26,7 @@ export function WorkspaceLayout() {
   const { activeCount } = useTransfers()
   const toast = useToast()
   const location = useLocation()
-  const [logoutOpen, setLogoutOpen] = useState(false)
+  const [dialog, setDialog] = useState(null)
   const [leaving, setLeaving] = useState(false)
   const isAdmin = user.role === 'admin'
   const navigation = isAdmin ? [...workspaceLinks, ...adminLinks] : workspaceLinks
@@ -40,7 +41,7 @@ export function WorkspaceLayout() {
       if (!(await logout())) toast({ title: '已退出本地会话', description: '服务端暂时无法确认撤销。', tone: 'warning' })
     } finally {
       setLeaving(false)
-      setLogoutOpen(false)
+      setDialog(null)
     }
   }
 
@@ -57,13 +58,15 @@ export function WorkspaceLayout() {
           <p className="mb-2 px-3 text-xs font-semibold tracking-wider text-muted">管理</p>
           <NavigationItems items={adminLinks} />
         </nav>}
-        <div className="mt-auto flex min-w-0 items-center gap-2.5 border-t border-line pt-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-mint text-primary"><Icon name="user" size={19} /></span>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold" title={username}>{username}</div>
-            <div className="mt-0.5 text-xs text-muted">{isAdmin ? '管理员' : '普通用户'}</div>
-          </div>
-          <Button variant="ghost" size="sm" icon="logout" className="icon-button" aria-label="退出登录" title="退出登录" onClick={() => setLogoutOpen(true)} />
+        <div className="mt-auto flex min-w-0 items-center gap-1.5 border-t border-line pt-3">
+          <button type="button" aria-label="查看账户信息" aria-haspopup="dialog" title="查看账户信息" onClick={() => setDialog('account')} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2 py-1.5 text-start transition hover:bg-mint">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-mint text-primary"><Icon name="user" size={19} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold" title={username}>{username}</span>
+              <span className="mt-0.5 block text-xs text-muted">{isAdmin ? '管理员' : '普通用户'}</span>
+            </span>
+          </button>
+          <Button variant="ghost" size="sm" icon="logout" className="icon-button" aria-label="退出登录" title="退出登录" onClick={() => setDialog('logout')} />
         </div>
       </aside>
 
@@ -75,15 +78,18 @@ export function WorkspaceLayout() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <ConnectionStatus status={status} onRetry={() => { void reconnect().catch(() => {}) }} />
-            <Button variant="ghost" size="sm" icon="logout" className="icon-button md:hidden" aria-label="退出登录" title="退出登录" onClick={() => setLogoutOpen(true)} />
+            <button type="button" aria-label="查看账户信息" aria-haspopup="dialog" title="查看账户信息" onClick={() => setDialog('account')} className="grid size-9 shrink-0 place-items-center rounded-xl border border-transparent bg-mint text-primary transition hover:border-primary md:hidden">
+              <Icon name="user" size={19} />
+            </button>
           </div>
         </header>
         <nav className="mobile-nav" aria-label="工作区导航"><NavigationItems items={navigation} activeTransfers={activeCount} /></nav>
         <main id="main-content" className="workspace-content" tabIndex={-1}><Outlet /></main>
       </div>
 
-      <Modal open={logoutOpen} onClose={() => { if (!leaving) setLogoutOpen(false) }} title="退出登录？" description="传输将暂停。再次登录后可以恢复已保存的断点。" footer={<>
-        <Button variant="secondary" disabled={leaving} onClick={() => setLogoutOpen(false)}>取消</Button>
+      <AccountPanel open={dialog === 'account'} onClose={() => setDialog(null)} onLogout={() => setDialog('logout')} />
+      <Modal open={dialog === 'logout'} onClose={() => { if (!leaving) setDialog(null) }} title="退出登录？" description="传输将暂停。再次登录后可以恢复已保存的断点。" footer={<>
+        <Button variant="secondary" disabled={leaving} onClick={() => setDialog(null)}>取消</Button>
         <Button variant="danger" icon="logout" busy={leaving} onClick={signOut}>退出登录</Button>
       </>} />
     </div>

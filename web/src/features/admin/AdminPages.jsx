@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
+import Icon from '../../components/Icon.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Modal } from '../../components/ui/Modal.jsx'
+import { RefreshButton } from '../../components/ui/RefreshButton.jsx'
 import { CreateAccountDialog, CredentialsDialog, EditAccessDialog, InviteAccountDialog } from './AccountDialogs.jsx'
-import { AdminHeader, PageControls, RefreshButton, Results, StatePill } from './AdminControls.jsx'
+import { AdminHeader, PageControls, Results, StatePill } from './AdminControls.jsx'
 import { formatBytes, formatDate, permissionLabels, useAdminPage } from './adminData.js'
 
 const panel = 'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm'
@@ -15,10 +17,7 @@ function UserIdentity({ user }) {
       <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-semibold text-emerald-800">
         {user.username.slice(0, 2).toUpperCase()}
       </span>
-      <div className="min-w-0">
-        <p className="max-w-48 truncate font-medium text-slate-900" title={user.username}>{user.username}</p>
-        <p className="mt-0.5 text-xs text-slate-500">{user.role === 'admin' ? '管理员' : '普通用户'}</p>
-      </div>
+      <p className="max-w-48 truncate font-medium text-slate-900" title={user.username}>{user.username}</p>
     </div>
   )
 }
@@ -59,11 +58,11 @@ function EnabledState({ enabled }) {
   return enabled ? <StatePill tone="positive">已启用</StatePill> : <StatePill>已禁用</StatePill>
 }
 
-function UserList({ users, select }) {
+function UserList({ users, select, headingId }) {
   return (
     <>
       <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full min-w-[755px] border-collapse" aria-label="账号列表">
+        <table className="w-full min-w-[755px] border-collapse" aria-labelledby={headingId}>
           <thead className="border-b border-slate-100 bg-slate-50/75">
             <tr>
               {['账号', '状态', '文件权限', '存储用量', '操作'].map((label) => <th key={label} scope="col" className={tableHeading}>{label}</th>)}
@@ -82,7 +81,7 @@ function UserList({ users, select }) {
           </tbody>
         </table>
       </div>
-      <ul aria-label="账号列表" className="divide-y divide-slate-100 lg:hidden">
+      <ul aria-labelledby={headingId} className="divide-y divide-slate-100 lg:hidden">
         {users.map((user) => (
           <li key={user.userId} className="space-y-3 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
@@ -101,9 +100,32 @@ function UserList({ users, select }) {
   )
 }
 
+function UserGroup({ title, icon, users, select, paginated }) {
+  const headingId = useId()
+
+  return (
+    <section className={panel} aria-labelledby={headingId}>
+      <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3.5 sm:px-5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
+          <Icon name={icon} size={18} />
+        </span>
+        <h2 className="text-base font-semibold text-slate-900" id={headingId}>{title}</h2>
+      </header>
+      {users.length > 0 ? (
+        <UserList users={users} select={select} headingId={headingId} />
+      ) : (
+        <p className="px-4 py-6 text-sm text-slate-500 sm:px-5">{paginated ? '本页暂无' : '暂无'}{title}</p>
+      )}
+    </section>
+  )
+}
+
 export function AdminUsers() {
   const page = useAdminPage('users')
   const [dialog, setDialog] = useState(null)
+  const administrators = page.items.filter((user) => user.role === 'admin')
+  const members = page.items.filter((user) => user.role === 'user')
+  const paginated = page.number > 1 || page.hasNext
 
   function select(type, user) {
     setDialog({ type, user })
@@ -121,15 +143,18 @@ export function AdminUsers() {
   return (
     <section className="min-w-0 space-y-5">
       <AdminHeader title="用户管理" description="分配文件权限、签发登记邀请和管理 Passkey。">
-        <RefreshButton onClick={page.refresh} disabled={page.loading} />
+        <RefreshButton onClick={page.refresh} loading={page.loading} />
         <Button icon="add" onClick={() => select('create')}>创建账号</Button>
       </AdminHeader>
-      <div className={panel}>
+      <div className={page.items.length ? undefined : panel}>
         <Results page={page} emptyIcon="users" emptyTitle="暂无账号" emptyDescription="可以创建账号，再分配文件权限。">
-          <UserList users={page.items} select={select} />
+          <div className="space-y-4">
+            <UserGroup title="管理员" icon="shield-check" users={administrators} select={select} paginated={paginated} />
+            <UserGroup title="普通用户" icon="users" users={members} select={select} paginated={paginated} />
+          </div>
         </Results>
-        <PageControls page={page} />
       </div>
+      {paginated && <div className={panel}><PageControls page={page} /></div>}
       {dialog?.type === 'create' && <CreateAccountDialog onClose={close} onSuccess={updateList} />}
       {dialog?.type === 'edit' && <EditAccessDialog user={dialog.user} onClose={close} onSuccess={updateList} />}
       {dialog?.type === 'invite' && <InviteAccountDialog user={dialog.user} onClose={close} />}
@@ -241,7 +266,7 @@ export function AdminAudit() {
   return (
     <section className="min-w-0 space-y-5">
       <AdminHeader title="操作审计" description="查看账号变更、登录和文件访问记录。">
-        <RefreshButton onClick={page.refresh} disabled={page.loading} />
+        <RefreshButton onClick={page.refresh} loading={page.loading} />
       </AdminHeader>
       <div className={panel}>
         <Results page={page} emptyIcon="history" emptyTitle="暂无审计记录" emptyDescription="记录产生后会按时间从新到旧显示。">

@@ -40,14 +40,8 @@ type credentialPageRequest struct {
 }
 
 type userSummary struct {
-	UserID      string   `json:"userId"`
-	Username    string   `json:"username"`
-	Role        string   `json:"role"`
-	Enabled     bool     `json:"enabled"`
-	Permissions []string `json:"permissions"`
-	Quota       uint64   `json:"quotaBytes"`
-	Used        uint64   `json:"usedBytes"`
-	Reserved    uint64   `json:"reservedBytes"`
+	UserProfile
+	Enabled bool `json:"enabled"`
 }
 
 type credentialSummary struct {

@@ -28,6 +28,33 @@ type account struct {
 	reserved    uint64
 }
 
+type UserProfile struct {
+	UserID      string   `json:"userId"`
+	Username    string   `json:"username"`
+	Role        string   `json:"role"`
+	Permissions []string `json:"permissions"`
+	Quota       uint64   `json:"quotaBytes"`
+	Used        uint64   `json:"usedBytes"`
+	Reserved    uint64   `json:"reservedBytes"`
+}
+
+// Profile returns current account details for the authenticated user ID.
+func (s *Store) Profile(ctx context.Context, actor wire.ID) (UserProfile, error) {
+	profile := UserProfile{UserID: actor.String()}
+	var permissions uint8
+	err := s.DB.QueryRowContext(ctx, `SELECT username, role, permissions,
+		quota_bytes, used_bytes, reserved_bytes FROM users WHERE id=? AND enabled=TRUE`, actor[:]).
+		Scan(&profile.Username, &profile.Role, &permissions, &profile.Quota, &profile.Used, &profile.Reserved)
+	if errors.Is(err, sql.ErrNoRows) {
+		return UserProfile{}, wire.E("UNAUTH", false)
+	}
+	if err != nil {
+		return UserProfile{}, err
+	}
+	profile.Permissions = permissionNames(permissions)
+	return profile, nil
+}
+
 func lockAccount(ctx context.Context, tx *sql.Tx, id wire.ID) (account, error) {
 	return scanAccount(tx.QueryRowContext(ctx, `SELECT id, role, enabled, permissions,
 		quota_bytes, used_bytes, reserved_bytes FROM users WHERE id=? FOR UPDATE`, id[:]))

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import FileIcon from '../../components/FileIcon.jsx'
 import Icon from '../../components/Icon.jsx'
 import { Button } from '../../components/ui/Button.jsx'
 import { Alert, EmptyState, Hint } from '../../components/ui/Feedback.jsx'
@@ -209,9 +210,7 @@ function TaskRow({ task, saving, onPause, onResume, onReselect, onSave, onCancel
   return (
     <li className="grid gap-3 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(9rem,16rem)_minmax(9rem,auto)] lg:items-center lg:gap-5">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-slate-100 bg-slate-50 text-slate-500">
-          <Icon name={task.kind === 'upload' ? 'upload' : 'download'} size={18} />
-        </span>
+        <FileIcon filename={task.name} />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-900" title={task.name}>{task.name}</p>
           <p className="mt-1 text-sm text-slate-500">{direction} · {formatBytes(task.size)}</p>

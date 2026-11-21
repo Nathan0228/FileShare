@@ -40,6 +40,8 @@ const (
 	ShareSet      Kind = 0x12
 	Admin         Kind = 0x13
 	FileDelete    Kind = 0x14
+	UserProfile   Kind = 0x15
+	UserProfileOK Kind = 0x16
 	PutBegin      Kind = 0x20
 	PutReady      Kind = 0x21
 	PutData       Kind = 0x22
@@ -144,7 +146,7 @@ func (m Message) ValidateRequest() error {
 	var hasID, hasChunk, data, empty bool
 	switch m.Kind {
 	case EnrollBegin, EnrollFinish, AuthBegin, AuthFinish, SessionAttach, List, ShareSet, Admin, FileDelete, PutBegin, GetBegin:
-	case Logout:
+	case Logout, UserProfile:
 		empty = true
 	case PutData:
 		hasID, hasChunk, data = true, true, true

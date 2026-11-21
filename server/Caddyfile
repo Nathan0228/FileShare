@@ -1,0 +1,25 @@
+
+# =====================================
+# SFT 文件传输 WebSocket 服务
+# =====================================
+
+fs-api.findingai.top {
+
+    tls {
+        protocols tls1.3 tls1.3
+    }
+
+    header Strict-Transport-Security "max-age=31536000"
+
+    @sft path /sft
+
+    handle @sft {
+        reverse_proxy sft-api:8080 {
+            header_up X-SFT-Client-IP {remote_host}
+        }
+    }
+
+    handle {
+        respond 404
+    }
+}

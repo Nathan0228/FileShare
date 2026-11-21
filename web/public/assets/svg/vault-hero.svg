@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="580" height="360" viewBox="0 0 580 360" fill="none">
+  <defs>
+    <linearGradient id="folder" x1="205" y1="92" x2="390" y2="278" gradientUnits="userSpaceOnUse"><stop stop-color="#8ce3b5"/><stop offset="1" stop-color="#3b9d79"/></linearGradient>
+    <linearGradient id="front" x1="213" y1="138" x2="360" y2="295" gradientUnits="userSpaceOnUse"><stop stop-color="#b8f5cf"/><stop offset="1" stop-color="#68c79e"/></linearGradient>
+    <linearGradient id="paper" x1="271" y1="92" x2="324" y2="207" gradientUnits="userSpaceOnUse"><stop stop-color="#fbfff6"/><stop offset="1" stop-color="#b6e2ca"/></linearGradient>
+    <linearGradient id="shield" x1="342" y1="194" x2="400" y2="277" gradientUnits="userSpaceOnUse"><stop stop-color="#236a54"/><stop offset="1" stop-color="#12392c"/></linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientTransform="translate(290 175) rotate(90) scale(164 238)" gradientUnits="userSpaceOnUse"><stop stop-color="#7fe0a7" stop-opacity=".21"/><stop offset="1" stop-color="#7fe0a7" stop-opacity="0"/></radialGradient>
+    <pattern id="dots" width="17" height="17" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".8" fill="#9bd3b4" opacity=".27"/></pattern>
+    <filter id="shadow" x="140" y="65" width="320" height="270" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="12" stdDeviation="13" flood-color="#031b11" flood-opacity=".45"/></filter>
+  </defs>
+  <rect x="34" y="15" width="512" height="326" fill="url(#halo)"/>
+  <rect x="53" y="38" width="126" height="93" fill="url(#dots)"/>
+  <rect x="413" y="235" width="119" height="91" fill="url(#dots)"/>
+  <g stroke="#90c8a8" stroke-opacity=".24">
+    <rect x="49" y="33" width="482" height="294" rx="20" stroke-dasharray="4 6"/>
+    <rect x="125" y="64" width="330" height="232" rx="38"/>
+    <circle cx="290" cy="180" r="143"/>
+    <circle cx="290" cy="180" r="106" stroke-dasharray="3 8"/>
+    <path d="M50 180h481M290 34v293" stroke-dasharray="3 5"/>
+    <path d="M78 110h86l44 45m-125 86h83l42-39m295-88h-62l-52 41m103 81h-54l-43-33"/>
+  </g>
+  <g fill="#9eebbc"><circle cx="164" cy="110" r="3"/><circle cx="165" cy="241" r="3"/><circle cx="441" cy="114" r="3"/><circle cx="438" cy="236" r="3"/><circle cx="290" cy="37" r="3"/><circle cx="290" cy="323" r="3"/></g>
+  <g fill="#1d493c" stroke="#72ba94">
+    <rect x="61" y="91" width="38" height="38" rx="10"/><rect x="70" y="223" width="32" height="32" rx="9"/>
+    <rect x="481" y="95" width="38" height="38" rx="10"/><rect x="475" y="220" width="32" height="32" rx="9"/>
+  </g>
+  <g stroke="#bcebcf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M75 103h8l3 3v11H75Zm7 0v4h4m-8 3h5m-5 3h3M86 233v12m-4-8 4-4 4 4"/>
+    <path d="M495 111v-3a5 5 0 0 1 10 0v3m-12 0h14v9h-14Zm-4 126h12m-4-4 4 4-4 4"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M186 126c0-10 8-18 18-18h44l20 16h101c10 0 18 8 18 18v83H186Z" fill="url(#folder)" stroke="#a6e9c3" stroke-width="1.5"/>
+    <path d="M248 91h75l21 21v106h-96a9 9 0 0 1-9-9V100a9 9 0 0 1 9-9Z" fill="url(#paper)" stroke="#f1fff5" stroke-width="1.5"/>
+    <path d="M323 92v16a5 5 0 0 0 5 5h16m-85 7h41m-41 11h61" stroke="#4b9b76" stroke-opacity=".63" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M190 151h189c11 0 19 10 17 21l-15 65a16 16 0 0 1-16 13H206a15 15 0 0 1-15-12l-16-66a17 17 0 0 1 15-21Z" fill="url(#front)" stroke="#c3f1d4" stroke-width="1.5"/>
+    <path d="M201 167h165" stroke="#fff" stroke-opacity=".39" stroke-width="1.5" stroke-linecap="round"/>
+    <rect x="220" y="213" width="44" height="11" rx="5.5" fill="#326e56" fill-opacity=".21"/>
+    <path d="M367 184c13 7 28 11 40 13v26c0 20-14 36-40 48-26-12-40-28-40-48v-26c12-2 27-6 40-13Z" fill="url(#shield)" stroke="#c5f3d5" stroke-width="2"/>
+    <path d="M367 193c10 5 20 8 31 10v20c0 17-11 30-31 40-20-10-31-23-31-40v-20c11-2 21-5 31-10Z" stroke="#7fc6a3" stroke-opacity=".58"/>
+    <path d="m354 224 9 9 17-17" stroke="#d7f9db" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

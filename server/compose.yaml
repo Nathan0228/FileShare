@@ -1,0 +1,60 @@
+name: sft
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: personal/sft-api:1.0
+    container_name: sft-api
+    
+    restart: unless-stopped
+    
+    env_file:
+      - .env
+    
+    environment:
+      SFT_DB_ADDR: mariadb:3306
+      SFT_DB_NAME: ${SFT_DB_NAME:-sft}
+      SFT_DB_USER: ${SFT_DB_USER:-sft}
+      SFT_DB_PASSWORD: ${SFT_DB_PASSWORD:?set SFT_DB_PASSWORD}
+    
+      SFT_LISTEN_ADDR: 0.0.0.0:8080
+      SFT_STORAGE_ROOT: /srv/sft
+    
+      SFT_ORIGIN: ${SFT_ORIGIN:?set SFT_ORIGIN}
+      SFT_RP_ID: ${SFT_RP_ID:?set SFT_RP_ID}
+    
+      SFT_TRUST_PROXY: "true"
+      SFT_LOG_LEVEL: ${SFT_LOG_LEVEL:-info}
+    
+    volumes:
+      - /srv/data/sft:/srv/sft
+    
+    networks:
+      - vps-backend
+    
+    read_only: true
+    
+    cap_drop:
+      - ALL
+    
+    security_opt:
+      - no-new-privileges:true
+    
+    mem_limit: 192m
+    mem_reservation: 64m
+    pids_limit: 64
+    cpus: 0.5
+    
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  vps-backend:
+    external: true
+    name: vps-backend

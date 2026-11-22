@@ -27,38 +27,40 @@ const (
 type Kind byte
 
 const (
-	EnrollBegin   Kind = 0x01
-	Challenge     Kind = 0x02
-	EnrollFinish  Kind = 0x03
-	AuthBegin     Kind = 0x04
-	AuthFinish    Kind = 0x05
-	AuthOK        Kind = 0x06
-	SessionAttach Kind = 0x07
-	Logout        Kind = 0x08
-	List          Kind = 0x10
-	ListOK        Kind = 0x11
-	ShareSet      Kind = 0x12
-	Admin         Kind = 0x13
-	FileDelete    Kind = 0x14
-	UserProfile   Kind = 0x15
-	UserProfileOK Kind = 0x16
-	PutBegin      Kind = 0x20
-	PutReady      Kind = 0x21
-	PutData       Kind = 0x22
-	PutStatus     Kind = 0x23
-	PutState      Kind = 0x24
-	PutCommit     Kind = 0x25
-	PutDone       Kind = 0x26
-	PutCancel     Kind = 0x27
-	PutPause      Kind = 0x28
-	GetBegin      Kind = 0x30
-	GetReady      Kind = 0x31
-	GetChunk      Kind = 0x32
-	GetData       Kind = 0x33
-	GetDone       Kind = 0x34
-	GetClose      Kind = 0x35
-	OK            Kind = 0x7d
-	Err           Kind = 0x7e
+	EnrollBegin      Kind = 0x01
+	Challenge        Kind = 0x02
+	EnrollFinish     Kind = 0x03
+	AuthBegin        Kind = 0x04
+	AuthFinish       Kind = 0x05
+	AuthOK           Kind = 0x06
+	SessionAttach    Kind = 0x07
+	Logout           Kind = 0x08
+	List             Kind = 0x10
+	ListOK           Kind = 0x11
+	ShareSet         Kind = 0x12
+	Admin            Kind = 0x13
+	FileDelete       Kind = 0x14
+	UserProfile      Kind = 0x15
+	UserProfileOK    Kind = 0x16
+	OutgoingShares   Kind = 0x17
+	OutgoingSharesOK Kind = 0x18
+	PutBegin         Kind = 0x20
+	PutReady         Kind = 0x21
+	PutData          Kind = 0x22
+	PutStatus        Kind = 0x23
+	PutState         Kind = 0x24
+	PutCommit        Kind = 0x25
+	PutDone          Kind = 0x26
+	PutCancel        Kind = 0x27
+	PutPause         Kind = 0x28
+	GetBegin         Kind = 0x30
+	GetReady         Kind = 0x31
+	GetChunk         Kind = 0x32
+	GetData          Kind = 0x33
+	GetDone          Kind = 0x34
+	GetClose         Kind = 0x35
+	OK               Kind = 0x7d
+	Err              Kind = 0x7e
 )
 
 type ID [16]byte
@@ -145,7 +147,7 @@ func (m Message) Encode() []byte {
 func (m Message) ValidateRequest() error {
 	var hasID, hasChunk, data, empty bool
 	switch m.Kind {
-	case EnrollBegin, EnrollFinish, AuthBegin, AuthFinish, SessionAttach, List, ShareSet, Admin, FileDelete, PutBegin, GetBegin:
+	case EnrollBegin, EnrollFinish, AuthBegin, AuthFinish, SessionAttach, List, ShareSet, Admin, FileDelete, OutgoingShares, PutBegin, GetBegin:
 	case Logout, UserProfile:
 		empty = true
 	case PutData:

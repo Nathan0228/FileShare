@@ -108,6 +108,16 @@ func (c *connection) control(ctx context.Context, m wire.Message, actor auth.Ide
 	case wire.UserProfile:
 		profile, err := c.gateway.store.Profile(ctx, user)
 		return jsonReply(m, wire.UserProfileOK, profile), err
+	case wire.OutgoingShares:
+		var req struct {
+			View   string  `json:"view"`
+			Cursor *string `json:"cursor"`
+		}
+		if err := wire.JSON(m.Body, &req); err != nil {
+			return wire.Message{}, err
+		}
+		page, err := c.gateway.store.OutgoingShares(ctx, user, req.View, req.Cursor)
+		return jsonReply(m, wire.OutgoingSharesOK, page), err
 	case wire.List:
 		var req struct {
 			Scope  string  `json:"scope"`

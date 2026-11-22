@@ -94,6 +94,7 @@ ff ff ff ff
 | `13 ADMIN` | `{action,...}`，见管理员接口 | `7D OK`，载荷取决于操作 |
 | `14 FILE_DELETE` | `{fileId}` | `7D OK` |
 | `15 USER_PROFILE` | 空 | `16 USER_PROFILE_OK` · `{userId,username,role,permissions,quotaBytes,usedBytes,reservedBytes}` |
+| `17 OUTGOING_SHARES` | `{view,cursor}`，`view` 为 `active` 或 `history` | `18 OUTGOING_SHARES_OK` · `{items,nextCursor}` |
 | `20 PUT_BEGIN` | `{opId,name,size,sha256}` | `21 PUT_READY` · `{size,sha256,chunkBytes,state}`，报头返回上传 ID |
 | `22 PUT_DATA` | 分片摘要与数据 | `7D OK`，报头回显上传 ID 和索引 |
 | `23 PUT_STATUS` | 空 | `24 PUT_STATE` · `{state,bitmap,fileId}`，未发布时 `fileId` 为 `null` |
@@ -119,9 +120,13 @@ ff ff ff ff
 
 ### 文件列表与共享
 
-`LIST` 返回条目 `{fileId,name,size,owner}`。所有者在 `owned` 查询自己的文件，`shared` 返回读权限有效且当前账号具备 `DOWNLOAD` 的文件。所有者具备 `SHARE` 时可针对指定用户授予或撤销读取权限。只有启用且具备 `DOWNLOAD` 的所有者或受让者可下载。管理员访问文件也按同一规则授权。只有所有者可删除文件，服务端立即隐藏文件，再由后台回收对象。
+`LIST` 返回条目 `{fileId,name,size,owner,createdAt,sharedAt}`。`createdAt` 是文件通过校验并发布的时间。所有者在 `owned` 查询自己的文件，此时 `sharedAt` 为 `null`。`shared` 返回读权限有效且当前账号具备 `DOWNLOAD` 的文件，`sharedAt` 为本账号当前授权生效的时间。时间字符串采用 RFC 3339 UTC 格式。所有者具备 `SHARE` 时可针对指定用户授予或撤销读取权限。只有启用且具备 `DOWNLOAD` 的所有者或受让者可下载。管理员访问文件也按同一规则授权。只有所有者可删除文件，服务端立即隐藏文件，再由后台回收对象。
 
 列表和管理员查询的首个 cursor 传 `null` 或省略。每页最多 20 条，同时受控制载荷大小限制。有下一页时客户端原样传回 `nextCursor`。游标关联当前用户、查询类型及条件，服务重启后从首页重新查询。
+
+`OUTGOING_SHARES` 只返回当前会话账号发出的共享，条目为 `{fileId,name,grantee,action,createdAt,deleted}`。`active` 返回调用者拥有的未删除文件的当前授权条目，`action` 为 `grant`，`createdAt` 为授权时间。接收者实际下载时仍需通过账号和下载权限检查。`history` 按最新操作优先返回近 30 天的成功授权及撤销，`action` 为 `grant` 或 `revoke`。已删除文件的历史可显示 `deleted:true`。查询游标与当前账号和视图绑定。
+
+前端对选中的文件逐项发送原有请求。批量下载将文件逐一加入传输队列。批量共享或撤销使用 `SHARE_SET`，批量删除使用 `FILE_DELETE`。单项成功立即生效，失败项可单独重试。
 
 ### 管理员接口
 
@@ -133,11 +138,13 @@ ff ff ff ff
 | `setAccess` | `username,enabled,permissions,quotaBytes` | 空 OK。配额为 0 到 2^50 字节整数，并须覆盖已用和预留字节。禁用账号时撤销其会话和待消费邀请 |
 | `invite` | `username` | `{inviteToken}`。对启用账号签发 15 分钟有效的一次性邀请，并替换该账号以前尚未消费的邀请 |
 | `revokeCredential` | `username,credentialId` | 空 OK。凭据 ID 为 base64url，同步撤销由该凭据建立的会话 |
-| `users` | `cursor` | `{items,nextCursor}`，条目为 `{userId,username,role,enabled,permissions,quotaBytes,usedBytes,reservedBytes}` |
+| `users` | `cursor`，可选 `role` 和 `search` | `{items,nextCursor}`，条目为 `{userId,username,role,enabled,permissions,quotaBytes,usedBytes,reservedBytes,createdAt}`，`createdAt` 是 RFC 3339 UTC 格式的账号创建时间 |
 | `credentials` | `username,cursor` | `{items,nextCursor}`，条目为 `{credentialId,createdAt,revokedAt}` |
 | `audit` | `cursor` | `{items,nextCursor}`，条目为 `{id,actorId,action,targetId,result,createdAt,requestMeta}` |
 
 审计 `id` 是十进制字符串，时间为 RFC 3339 UTC 字符串，缺省的撤销时间、操作者、目标和附加信息为 `null`。引导管理员的初始配额为 8 GiB。管理员可先用 `create` 创建用户，再用 `setAccess` 下发权限与配额，最后用 `invite` 签发登记邀请。
+
+`users` 的 `role` 可选 `admin` 或 `user`。`role` 为 `user` 时可以用 `search` 按用户名中包含的文字搜索。搜索词去除首尾空格后按不区分大小写的方式匹配，最多 64 个 ASCII 字母、数字、点、下划线或连字符。更改角色或搜索词后，从空游标开始请求。
 
 ### 上传、确认与续传
 

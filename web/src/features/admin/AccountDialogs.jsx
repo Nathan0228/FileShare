@@ -205,7 +205,7 @@ export function InviteAccountDialog({ user, onClose }) {
 }
 
 export function CredentialsDialog({ user, onClose }) {
-  const page = useAdminPage('credentials', user.username)
+  const page = useAdminPage('credentials', { username: user.username })
   const [selected, setSelected] = useState(null)
   const { perform, pending, error, setError } = useAdminMutation()
   const toast = useToast()

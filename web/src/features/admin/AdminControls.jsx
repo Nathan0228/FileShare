@@ -15,10 +15,10 @@ export function AdminHeader({ title, description, children }) {
   )
 }
 
-export function PageControls({ page }) {
+export function PageControls({ page, label = '表格分页' }) {
   if (page.number === 1 && !page.hasNext) return null
   return (
-    <nav aria-label="表格分页" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
+    <nav aria-label={label} className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
       <span className="text-sm text-slate-500">第 {page.number} 页</span>
       <div className="flex items-center gap-2">
         <Button variant="secondary" size="sm" disabled={page.number === 1 || page.loading} onClick={page.previous}>上一页</Button>

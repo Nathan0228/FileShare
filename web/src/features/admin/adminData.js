@@ -3,6 +3,8 @@ import { useSession } from '../auth/session.js'
 import { getErrorMessage } from '../../services/errors.js'
 import { Type } from '../../services/protocol.js'
 
+export { formatDate } from '../../utils/dateTime.js'
+
 export const permissionLabels = {
   UPLOAD: '上传',
   DOWNLOAD: '下载',
@@ -14,7 +16,6 @@ export const usernamePattern = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
 const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
 const decimals = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 })
-const dates = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
 const mutationErrors = {
   create: { CONFLICT: '该账号名已存在。' },
   setAccess: { QUOTA: '当前用量已变化。请刷新账号列表后重新设置配额。' },
@@ -27,29 +28,28 @@ export function formatBytes(value) {
   return `${decimals.format(value / (1024 ** unit))} ${sizes[unit]}`
 }
 
-export function formatDate(value) {
-  const date = new Date(value)
-  return value && !Number.isNaN(date.getTime()) ? dates.format(date) : '—'
-}
-
-export function useAdminPage(action, username = '') {
+export function useAdminPage(action, { username = '', role = '' } = {}) {
   const { request } = useSession()
-  const [navigation, setNavigation] = useState({ cursors: [null], revision: 0 })
+  const [navigation, setNavigation] = useState({ cursors: [null], revision: 0, search: '' })
   const [result, setResult] = useState(null)
   const cursor = navigation.cursors.at(-1)
-  const key = JSON.stringify([action, username, cursor, navigation.revision])
+  const { search } = navigation
+  const key = JSON.stringify([action, username, role, search, cursor, navigation.revision])
 
   useEffect(() => {
     const controller = new AbortController()
 
     async function load() {
       try {
-        const params = username ? { username, cursor } : { cursor }
-        const { body } = await request(Type.ADMIN, {
-          body: { action, ...params },
+        const body = { action, cursor }
+        if (username) body.username = username
+        if (role) body.role = role
+        if (search) body.search = search
+        const response = await request(Type.ADMIN, {
+          body,
           signal: controller.signal,
         })
-        if (!controller.signal.aborted) setResult({ key, body })
+        if (!controller.signal.aborted) setResult({ key, body: response.body })
       } catch (error) {
         if (!controller.signal.aborted) setResult({ key, error: getErrorMessage(error) })
       }
@@ -57,7 +57,7 @@ export function useAdminPage(action, username = '') {
 
     load()
     return () => controller.abort()
-  }, [action, cursor, key, request, username])
+  }, [action, cursor, key, request, role, search, username])
 
   const current = result?.key === key ? result : null
   const nextCursor = current?.body?.nextCursor
@@ -68,8 +68,10 @@ export function useAdminPage(action, username = '') {
     error: current?.error,
     number: navigation.cursors.length,
     hasNext: Boolean(nextCursor),
+    search,
     previous() {
       setNavigation((previous) => ({
+        ...previous,
         cursors: previous.cursors.length > 1 ? previous.cursors.slice(0, -1) : previous.cursors,
         revision: previous.revision + 1,
       }))
@@ -77,12 +79,16 @@ export function useAdminPage(action, username = '') {
     next() {
       if (!nextCursor) return
       setNavigation((previous) => previous.cursors.at(-1) === nextCursor ? previous : {
+        ...previous,
         cursors: [...previous.cursors, nextCursor],
         revision: previous.revision + 1,
       })
     },
     refresh() {
-      setNavigation((previous) => ({ cursors: [null], revision: previous.revision + 1 }))
+      setNavigation((previous) => ({ ...previous, cursors: [null], revision: previous.revision + 1 }))
+    },
+    setSearch(value) {
+      setNavigation((previous) => ({ cursors: [null], revision: previous.revision + 1, search: value }))
     },
   }
 }

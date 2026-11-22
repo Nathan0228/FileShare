@@ -1,0 +1,41 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: 361121
+      MARIADB_DATABASE: sft
+      MARIADB_USER: sft
+      MARIADB_PASSWORD: 361121
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SFT_DB_ADDR: mariadb:3306
+      SFT_DB_NAME: sft
+      SFT_DB_USER: sft
+      SFT_DB_PASSWORD: 361121
+      SFT_LISTEN_ADDR: 0.0.0.0:8080
+      SFT_STORAGE_ROOT: /srv/sft
+      SFT_ORIGIN: http://localhost:5173
+      SFT_RP_ID: localhost
+      SFT_TRUST_PROXY: "false"
+    volumes:
+      - sft-files:/srv/sft
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  mariadb-data:
+  sft-files:

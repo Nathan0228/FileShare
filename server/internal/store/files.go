@@ -4,15 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"sft/internal/wire"
 )
 
 type FileSummary struct {
-	FileID string `json:"fileId"`
-	Name   string `json:"name"`
-	Size   uint64 `json:"size"`
-	Owner  string `json:"owner"`
+	FileID    string     `json:"fileId"`
+	Name      string     `json:"name"`
+	Size      uint64     `json:"size"`
+	Owner     string     `json:"owner"`
+	CreatedAt time.Time  `json:"createdAt"`
+	SharedAt  *time.Time `json:"sharedAt"`
 }
 
 type FilePage = Page[FileSummary]
@@ -21,13 +24,13 @@ func (s *Store) List(ctx context.Context, actor wire.ID, scope string, cursor *s
 	var query string
 	switch scope {
 	case "owned":
-		query = `SELECT f.id, f.name, f.size, owner.username
+		query = `SELECT f.id, f.name, f.size, owner.username, f.created_at, NULL
 			FROM files f JOIN users owner ON owner.id=f.owner_id
 			WHERE owner.id=? AND owner.enabled=TRUE
 			AND f.deleted_at IS NULL AND f.id>?
 			ORDER BY f.id LIMIT 21`
 	case "shared":
-		query = `SELECT f.id, f.name, f.size, owner.username
+		query = `SELECT f.id, f.name, f.size, owner.username, f.created_at, acl.granted_at
 			FROM file_acl acl JOIN files f ON f.id=acl.file_id
 			JOIN users owner ON owner.id=f.owner_id
 			JOIN users grantee ON grantee.id=acl.grantee_id
@@ -45,7 +48,7 @@ func (s *Store) List(ctx context.Context, actor wire.ID, scope string, cursor *s
 	return readPage(ctx, s, actor, key, query, func(rows *sql.Rows) (FileSummary, []byte, error) {
 		var file FileSummary
 		var id []byte
-		err := rows.Scan(&id, &file.Name, &file.Size, &file.Owner)
+		err := rows.Scan(&id, &file.Name, &file.Size, &file.Owner, &file.CreatedAt, &file.SharedAt)
 		if err == nil {
 			file.FileID = wire.ID(id).String()
 		}

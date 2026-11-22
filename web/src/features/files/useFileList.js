@@ -37,6 +37,11 @@ export function useFileList(scope, uploadRevision) {
     setRevision((current) => current + 1)
   }
 
+  function removeFiles(ids) {
+    const removed = new Set(ids)
+    setPage((current) => ({ ...current, items: current.items.filter(({ fileId }) => !removed.has(fileId)) }))
+  }
+
   async function loadMore() {
     if (!ready || !page.nextCursor || page.key !== key || extraRequest.current) return
     const controller = new AbortController()
@@ -61,5 +66,5 @@ export function useFileList(scope, uploadRevision) {
     }
   }
 
-  return { ...page, loading: ready && page.key !== key, pagination, refresh, loadMore, ready }
+  return { ...page, loading: ready && page.key !== key, pagination, refresh, loadMore, removeFiles, ready }
 }

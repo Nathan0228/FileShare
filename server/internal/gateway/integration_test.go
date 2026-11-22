@@ -82,6 +82,7 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	request := up.request(wire.List, wire.ID{}, wire.NoChunk, map[string]string{"scope": "owned"})
 	assertCode(t, request, "UNAUTH")
 	assertCode(t, up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, nil), "UNAUTH")
+	assertCode(t, up.request(wire.OutgoingShares, wire.ID{}, wire.NoChunk, map[string]string{"view": "active"}), "UNAUTH")
 	up.attach(ownerToken)
 	self := up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, nil)
 	assertKind(t, self, wire.UserProfileOK)
@@ -99,6 +100,8 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	newUser := "new-" + grantee
 	create := map[string]any{"action": "create", "username": newUser}
 	assertCode(t, up.request(wire.Admin, wire.ID{}, wire.NoChunk, create), "DENIED")
+	search := map[string]string{"action": "users", "role": "user", "search": strings.ToUpper(newUser)}
+	assertCode(t, up.request(wire.Admin, wire.ID{}, wire.NoChunk, search), "DENIED")
 	adminName, adminToken := seedSession(t, ctx, db)
 	if _, err := db.DB.ExecContext(ctx, "UPDATE users SET role='admin' WHERE username=?", adminName); err != nil {
 		t.Fatal(err)
@@ -110,6 +113,23 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 		"action": "setAccess", "username": newUser, "enabled": true,
 		"permissions": []string{"DOWNLOAD"}, "quotaBytes": 2 * wire.ChunkBytes,
 	}), wire.OK)
+	users := admin.request(wire.Admin, wire.ID{}, wire.NoChunk, search)
+	assertKind(t, users, wire.OK)
+	var userPage store.Page[struct {
+		store.UserProfile
+		CreatedAt time.Time `json:"createdAt"`
+	}]
+	if err := json.Unmarshal(users.Body, &userPage); err != nil || len(userPage.Items) != 1 ||
+		userPage.Items[0].Username != newUser || userPage.Items[0].Role != "user" ||
+		userPage.Items[0].CreatedAt.IsZero() || userPage.NextCursor != nil {
+		t.Fatalf("unexpected filtered user page: %s (%v)", users.Body, err)
+	}
+	search["search"] = adminName
+	users = admin.request(wire.Admin, wire.ID{}, wire.NoChunk, search)
+	assertKind(t, users, wire.OK)
+	if err := json.Unmarshal(users.Body, &userPage); err != nil || len(userPage.Items) != 0 {
+		t.Fatalf("ordinary-user filter returned an administrator: %s (%v)", users.Body, err)
+	}
 	invitation := admin.request(wire.Admin, wire.ID{}, wire.NoChunk, map[string]any{"action": "invite", "username": newUser})
 	assertKind(t, invitation, wire.OK)
 	var invite struct{ InviteToken string }
@@ -176,8 +196,11 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	}
 	listed := up.request(wire.List, wire.ID{}, wire.NoChunk, map[string]string{"scope": "owned"})
 	assertKind(t, listed, wire.ListOK)
-	if !bytes.Contains(listed.Body, []byte(owner)) || !bytes.Contains(listed.Body, []byte(done.FileID.String())) {
-		t.Fatalf("missing published object in LIST: %s", listed.Body)
+	var ownedPage store.FilePage
+	if err := json.Unmarshal(listed.Body, &ownedPage); err != nil || len(ownedPage.Items) != 1 ||
+		ownedPage.Items[0].Owner != owner || ownedPage.Items[0].FileID != done.FileID.String() ||
+		ownedPage.Items[0].CreatedAt.IsZero() || ownedPage.Items[0].SharedAt != nil {
+		t.Fatalf("unexpected owned LIST: %s (%v)", listed.Body, err)
 	}
 	assertMixedTransfers(t, up, done.FileID)
 
@@ -187,6 +210,20 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	assertCode(t, down.request(wire.GetBegin, wire.ID{}, wire.NoChunk, file), "DENIED")
 	share := map[string]any{"fileId": done.FileID, "grantee": grantee, "allow": true}
 	assertKind(t, up.request(wire.ShareSet, wire.ID{}, wire.NoChunk, share), wire.OK)
+	grant := store.OutgoingShare{FileID: done.FileID.String(), Name: "resume.bin", Grantee: grantee, Action: "grant"}
+	assertOutgoingShares(t, up, "active", grant)
+	assertOutgoingShares(t, up, "history", grant)
+	assertOutgoingShares(t, down, "active")
+	assertOutgoingShares(t, down, "history")
+	shared := down.request(wire.List, wire.ID{}, wire.NoChunk, map[string]string{"scope": "shared"})
+	assertKind(t, shared, wire.ListOK)
+	var sharedPage store.FilePage
+	if err := json.Unmarshal(shared.Body, &sharedPage); err != nil || len(sharedPage.Items) != 1 ||
+		sharedPage.Items[0].FileID != done.FileID.String() || sharedPage.Items[0].SharedAt == nil ||
+		!sharedPage.Items[0].CreatedAt.Equal(ownedPage.Items[0].CreatedAt) ||
+		!sharedPage.Items[0].SharedAt.After(sharedPage.Items[0].CreatedAt) {
+		t.Fatalf("unexpected shared LIST: %s (%v)", shared.Body, err)
+	}
 	ready := down.request(wire.GetBegin, wire.ID{}, wire.NoChunk, file)
 	assertKind(t, ready, wire.GetReady)
 	part := down.request(wire.GetChunk, ready.TransferID, 1, nil)
@@ -196,9 +233,35 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	}
 	share["allow"] = false
 	assertKind(t, up.request(wire.ShareSet, wire.ID{}, wire.NoChunk, share), wire.OK)
+	revoke := grant
+	revoke.Action = "revoke"
+	assertOutgoingShares(t, up, "active")
+	assertOutgoingShares(t, up, "history", revoke, grant)
 	assertCode(t, down.request(wire.GetChunk, ready.TransferID, 2, nil), "DENIED")
+	assertKind(t, up.request(wire.FileDelete, wire.ID{}, wire.NoChunk, file), wire.OK)
+	revoke.Deleted = true
+	grant.Deleted = true
+	assertOutgoingShares(t, up, "active")
+	assertOutgoingShares(t, up, "history", revoke, grant)
 	assertKind(t, up.request(wire.Logout, wire.ID{}, wire.NoChunk, nil), wire.OK)
 	assertCode(t, connect().request(wire.SessionAttach, wire.ID{}, wire.NoChunk, map[string]string{"token": ownerToken}), "UNAUTH")
+}
+
+func assertOutgoingShares(t *testing.T, conn *testConn, view string, want ...store.OutgoingShare) {
+	t.Helper()
+	reply := conn.request(wire.OutgoingShares, wire.ID{}, wire.NoChunk, map[string]string{"view": view})
+	assertKind(t, reply, wire.OutgoingSharesOK)
+	var page store.Page[store.OutgoingShare]
+	if err := json.Unmarshal(reply.Body, &page); err != nil || len(page.Items) != len(want) || page.NextCursor != nil {
+		t.Fatalf("unexpected %s share page: %s (%v)", view, reply.Body, err)
+	}
+	for i, expected := range want {
+		item := page.Items[i]
+		if item.CreatedAt.IsZero() || item.FileID != expected.FileID || item.Name != expected.Name ||
+			item.Grantee != expected.Grantee || item.Action != expected.Action || item.Deleted != expected.Deleted {
+			t.Fatalf("unexpected %s share item: %+v (expected %+v)", view, item, expected)
+		}
+	}
 }
 
 func assertMixedTransfers(t *testing.T, conn *testConn, firstFile wire.ID) {

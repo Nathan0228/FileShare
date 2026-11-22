@@ -1,6 +1,8 @@
 import { useId, useState } from 'react'
 import Icon from '../../components/Icon.jsx'
+import RecordTime from '../../components/RecordTime.jsx'
 import { Button } from '../../components/ui/Button.jsx'
+import { Field } from '../../components/ui/Field.jsx'
 import { Modal } from '../../components/ui/Modal.jsx'
 import { RefreshButton } from '../../components/ui/RefreshButton.jsx'
 import { CreateAccountDialog, CredentialsDialog, EditAccessDialog, InviteAccountDialog } from './AccountDialogs.jsx'
@@ -62,10 +64,10 @@ function UserList({ users, select, headingId }) {
   return (
     <>
       <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full min-w-[755px] border-collapse" aria-labelledby={headingId}>
+        <table className="w-full min-w-[860px] border-collapse" aria-labelledby={headingId}>
           <thead className="border-b border-slate-100 bg-slate-50/75">
             <tr>
-              {['账号', '状态', '文件权限', '存储用量', '操作'].map((label) => <th key={label} scope="col" className={tableHeading}>{label}</th>)}
+              {['账号', '状态', '文件权限', '存储用量', '创建时间', '操作'].map((label) => <th key={label} scope="col" className={tableHeading}>{label}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -75,6 +77,7 @@ function UserList({ users, select, headingId }) {
                 <td className={tableCell}><EnabledState enabled={user.enabled} /></td>
                 <td className={tableCell}><UserPermissions permissions={user.permissions} /></td>
                 <td className={tableCell}><UserQuota user={user} /></td>
+                <td className={tableCell}><RecordTime value={user.createdAt} className="whitespace-nowrap text-slate-500" /></td>
                 <td className={tableCell}><UserActions user={user} select={select} /></td>
               </tr>
             ))}
@@ -91,6 +94,7 @@ function UserList({ users, select, headingId }) {
             <dl className="grid grid-cols-2 gap-3">
               <div className="min-w-0 space-y-1"><dt className="text-sm text-slate-500">文件权限</dt><dd><UserPermissions permissions={user.permissions} /></dd></div>
               <div className="min-w-0 space-y-1"><dt className="text-sm text-slate-500">存储用量</dt><dd><UserQuota user={user} /></dd></div>
+              <div className="col-span-2 min-w-0 space-y-1"><dt className="text-sm text-slate-500">创建时间</dt><dd className="text-sm text-slate-700"><RecordTime value={user.createdAt} /></dd></div>
             </dl>
             <UserActions user={user} select={select} />
           </li>
@@ -100,8 +104,10 @@ function UserList({ users, select, headingId }) {
   )
 }
 
-function UserGroup({ title, icon, users, select, paginated }) {
+function UserGroup({ title, icon, page, select, children }) {
   const headingId = useId()
+  const emptyTitle = page.search ? '未找到匹配的普通用户' : `暂无${title}`
+  const emptyDescription = page.search ? `没有用户名包含「${page.search}」。` : undefined
 
   return (
     <section className={panel} aria-labelledby={headingId}>
@@ -111,21 +117,66 @@ function UserGroup({ title, icon, users, select, paginated }) {
         </span>
         <h2 className="text-base font-semibold text-slate-900" id={headingId}>{title}</h2>
       </header>
-      {users.length > 0 ? (
-        <UserList users={users} select={select} headingId={headingId} />
-      ) : (
-        <p className="px-4 py-6 text-sm text-slate-500 sm:px-5">{paginated ? '本页暂无' : '暂无'}{title}</p>
-      )}
+      {children}
+      <Results page={page} emptyIcon={icon} emptyTitle={emptyTitle} emptyDescription={emptyDescription}>
+        <UserList users={page.items} select={select} headingId={headingId} />
+      </Results>
+      <PageControls page={page} label={`${title}分页`} />
     </section>
   )
 }
 
+const usernameFragment = /^[a-z0-9._-]{0,64}$/
+
+function UserSearch({ page }) {
+  const [input, setInput] = useState('')
+  const [error, setError] = useState('')
+
+  function search(event) {
+    event.preventDefault()
+    const value = input.trim().toLowerCase()
+    if (!usernameFragment.test(value)) {
+      setError('搜索词可包含字母、数字、点、下划线和连字符，最多 64 个字符。')
+      return
+    }
+    setError('')
+    setInput(value)
+    page.setSearch(value)
+  }
+
+  function clear() {
+    setInput('')
+    setError('')
+    if (page.search) page.setSearch('')
+  }
+
+  return (
+    <form role="search" aria-label="搜索普通用户" onSubmit={search} className="space-y-2 border-b border-slate-100 px-4 py-3.5 sm:px-5">
+      <div className="flex flex-wrap items-end gap-2">
+        <Field
+          label="用户名"
+          icon="search"
+          className="min-w-44 flex-1 sm:max-w-xs"
+          type="search"
+          placeholder="输入用户名或其中一部分"
+          value={input}
+          onChange={(event) => { setInput(event.target.value); setError('') }}
+          maxLength={64}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <Button type="submit" variant="secondary">搜索</Button>
+        {(input || page.search) && <Button variant="ghost" onClick={clear}>清除搜索</Button>}
+      </div>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    </form>
+  )
+}
+
 export function AdminUsers() {
-  const page = useAdminPage('users')
+  const administrators = useAdminPage('users', { role: 'admin' })
+  const members = useAdminPage('users', { role: 'user' })
   const [dialog, setDialog] = useState(null)
-  const administrators = page.items.filter((user) => user.role === 'admin')
-  const members = page.items.filter((user) => user.role === 'user')
-  const paginated = page.number > 1 || page.hasNext
 
   function select(type, user) {
     setDialog({ type, user })
@@ -137,24 +188,24 @@ export function AdminUsers() {
 
   function updateList() {
     close()
-    page.refresh()
+    members.refresh()
+  }
+
+  function refresh() {
+    administrators.refresh()
+    members.refresh()
   }
 
   return (
     <section className="min-w-0 space-y-5">
       <AdminHeader title="用户管理" description="分配文件权限、签发登记邀请和管理 Passkey。">
-        <RefreshButton onClick={page.refresh} loading={page.loading} />
+        <RefreshButton onClick={refresh} loading={administrators.loading || members.loading} />
         <Button icon="add" onClick={() => select('create')}>创建账号</Button>
       </AdminHeader>
-      <div className={page.items.length ? undefined : panel}>
-        <Results page={page} emptyIcon="users" emptyTitle="暂无账号" emptyDescription="可以创建账号，再分配文件权限。">
-          <div className="space-y-4">
-            <UserGroup title="管理员" icon="shield-check" users={administrators} select={select} paginated={paginated} />
-            <UserGroup title="普通用户" icon="users" users={members} select={select} paginated={paginated} />
-          </div>
-        </Results>
-      </div>
-      {paginated && <div className={panel}><PageControls page={page} /></div>}
+      <UserGroup title="管理员" icon="shield-check" page={administrators} select={select} />
+      <UserGroup title="普通用户" icon="users" page={members} select={select}>
+        <UserSearch page={members} />
+      </UserGroup>
       {dialog?.type === 'create' && <CreateAccountDialog onClose={close} onSuccess={updateList} />}
       {dialog?.type === 'edit' && <EditAccessDialog user={dialog.user} onClose={close} onSuccess={updateList} />}
       {dialog?.type === 'invite' && <InviteAccountDialog user={dialog.user} onClose={close} />}

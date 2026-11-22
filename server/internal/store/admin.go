@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"sft/internal/wire"
@@ -34,6 +36,14 @@ type pageRequest struct {
 	Cursor *string `json:"cursor"`
 }
 
+type usersPageRequest struct {
+	pageRequest
+	Role   string `json:"role"`
+	Search string `json:"search"`
+}
+
+var usernameSearchPattern = regexp.MustCompile(`^[a-z0-9._-]{0,64}$`)
+
 type credentialPageRequest struct {
 	pageRequest
 	Username string `json:"username"`
@@ -41,7 +51,8 @@ type credentialPageRequest struct {
 
 type userSummary struct {
 	UserProfile
-	Enabled bool `json:"enabled"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type credentialSummary struct {
@@ -96,16 +107,22 @@ func (s *Store) Admin(ctx context.Context, actor wire.ID, payload []byte) (any, 
 			return nil, wire.E("BAD_REQUEST", false)
 		}
 		return nil, s.revokeCredential(ctx, actor, request)
-	case "users", "audit":
-		var request pageRequest
+	case "users":
+		var request usersPageRequest
 		if err := wire.JSON(payload, &request); err != nil {
 			return nil, err
 		}
 		if err := s.requireAdmin(ctx, actor); err != nil {
 			return nil, err
 		}
-		if request.Action == "users" {
-			return s.usersPage(ctx, actor, request.Cursor)
+		return s.usersPage(ctx, actor, request)
+	case "audit":
+		var request pageRequest
+		if err := wire.JSON(payload, &request); err != nil {
+			return nil, err
+		}
+		if err := s.requireAdmin(ctx, actor); err != nil {
+			return nil, err
 		}
 		return s.auditPage(ctx, actor, request.Cursor)
 	case "credentials":
@@ -283,25 +300,37 @@ func (s *Store) revokeCredential(ctx context.Context, actor wire.ID, request rev
 	return tx.Commit()
 }
 
-func (s *Store) usersPage(ctx context.Context, actor wire.ID, cursor *string) (Page[userSummary], error) {
-	const scope = "admin/users"
-	boundary, err := s.readCursor(actor, scope, cursor, 16, 16)
+func (s *Store) usersPage(ctx context.Context, actor wire.ID, request usersPageRequest) (Page[userSummary], error) {
+	search := strings.ToLower(strings.TrimSpace(request.Search))
+	if request.Role != "" && request.Role != "admin" && request.Role != "user" {
+		return Page[userSummary]{}, wire.E("BAD_REQUEST", false)
+	}
+	if search != "" && (request.Role != "user" || !usernameSearchPattern.MatchString(search)) {
+		return Page[userSummary]{}, wire.E("BAD_REQUEST", false)
+	}
+
+	scope := "admin/users"
+	if request.Role != "" {
+		scope += "/" + request.Role + "/" + search
+	}
+	boundary, err := s.readCursor(actor, scope, request.Cursor, 16, 16)
 	if err != nil {
 		return Page[userSummary]{}, err
 	}
-	const query = `SELECT id, username, role, enabled, permissions, quota_bytes, used_bytes, reserved_bytes
-		FROM users WHERE id>? ORDER BY id LIMIT 21`
+	const query = `SELECT id, username, role, enabled, permissions, quota_bytes, used_bytes, reserved_bytes, created_at
+		FROM users WHERE id>? AND (?='' OR role=?) AND (?='' OR LOCATE(?, username)>0)
+		ORDER BY id LIMIT 21`
 	return readPage(ctx, s, actor, scope, query, func(rows *sql.Rows) (userSummary, []byte, error) {
 		var user userSummary
 		var id []byte
 		var permissions uint8
-		err := rows.Scan(&id, &user.Username, &user.Role, &user.Enabled, &permissions, &user.Quota, &user.Used, &user.Reserved)
+		err := rows.Scan(&id, &user.Username, &user.Role, &user.Enabled, &permissions, &user.Quota, &user.Used, &user.Reserved, &user.CreatedAt)
 		if err == nil {
 			user.UserID = wire.ID(id).String()
 			user.Permissions = permissionNames(permissions)
 		}
 		return user, id, err
-	}, boundary)
+	}, boundary, request.Role, request.Role, search, search)
 }
 
 func (s *Store) credentialsPage(ctx context.Context, actor wire.ID, username string, cursor *string) (Page[credentialSummary], error) {

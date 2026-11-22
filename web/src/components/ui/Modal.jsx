@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react'
 import { Button } from './Button.jsx'
 
-export function Modal({ open, onClose, title, description, children, footer }) {
+export function Modal({ open, onClose, title, description, children, footer, className = '' }) {
   const element = useRef(null)
   const titleId = useId()
   const descriptionId = useId()
@@ -15,7 +15,7 @@ export function Modal({ open, onClose, title, description, children, footer }) {
   return (
     <dialog
       ref={element}
-      className="ui-modal"
+      className={`ui-modal ${className}`}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       onCancel={(event) => { event.preventDefault(); onClose() }}
@@ -23,8 +23,8 @@ export function Modal({ open, onClose, title, description, children, footer }) {
     >
       <div className="ui-modal-content">
         <header className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id={titleId} className="text-xl font-bold tracking-tight text-ink">{title}</h2>
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-xl font-bold tracking-tight wrap-anywhere text-ink">{title}</h2>
             {description && <p id={descriptionId} className="mt-2 text-sm leading-relaxed text-muted">{description}</p>}
           </div>
           <Button variant="ghost" size="sm" icon="x" onClick={onClose} aria-label="关闭弹窗" className="icon-button" />

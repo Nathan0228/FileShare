@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import FileIcon from '../../components/FileIcon.jsx'
 import Icon from '../../components/Icon.jsx'
 import RecordTime from '../../components/RecordTime.jsx'
 import { Button } from '../../components/ui/Button.jsx'
@@ -13,6 +12,9 @@ import { useTransfers } from '../transfers/index.js'
 import { formatBytes } from '../transfers/file-data.js'
 import { applyToFiles } from './fileActions.js'
 import { DeleteFileDialog, ShareDialog } from './FileDialogs.jsx'
+import { FilePreviewDialog } from './FilePreviewDialog.jsx'
+import { FilePreviewTrigger } from './FilePreviewTrigger.jsx'
+import { getPreviewType } from './previewTypes.js'
 import { useFileList } from './useFileList.js'
 
 function FileSelection({ label, checked, mixed = false, disabled, onChange }) {
@@ -29,20 +31,14 @@ function FileSelection({ label, checked, mixed = false, disabled, onChange }) {
   )
 }
 
-function FileRow({ file, owned, timeLabel, canDownload, canShare, ready, selected, onSelect, onDownload, onShare, onDelete }) {
+function FileRow({ file, owned, timeLabel, canDownload, canShare, ready, selected, onSelect, onDownload, onShare, onDelete, onPreview }) {
   const parts = file.name.split('.')
   const extension = parts.length > 1 && parts.at(-1).length <= 5 ? parts.at(-1).toUpperCase() : ''
   const time = owned ? file.createdAt : file.sharedAt
   return (
     <li className={`file-row transition-colors ${selected ? 'bg-[#f0f8f3]' : 'hover:bg-[#f8faf9]'}`}>
       <FileSelection label={`选择 ${file.name}`} checked={selected} onChange={(checked) => onSelect(file.fileId, checked)} />
-      <div className="flex min-w-0 items-center gap-3">
-        <FileIcon filename={file.name} />
-        <div className="min-w-0">
-          <p title={file.name} className="truncate text-sm font-semibold text-ink">{file.name}</p>
-          {extension && <p className="mt-0.5 hidden text-xs text-muted lg:block">{extension}</p>}
-        </div>
-      </div>
+      <FilePreviewTrigger name={file.name} extension={extension} onPreview={() => onPreview(file)} />
       <span className="hidden text-sm tabular-nums text-muted lg:block">{formatBytes(file.size)}</span>
       <span className="hidden truncate text-sm text-muted lg:block" title={file.owner}>{file.owner}</span>
       <RecordTime value={time} className="hidden min-w-0 text-sm tabular-nums text-muted lg:block" />
@@ -149,6 +145,23 @@ export function FileBrowserPage({ scope }) {
     }
   }
 
+  function preview(file) {
+    const type = getPreviewType(file.name)
+    if (!type) {
+      toast({ title: '暂不支持预览此文件格式', description: file.name })
+      return
+    }
+    if (!page.ready || !user.permissions.includes('DOWNLOAD')) {
+      toast({ title: '预览需有效连接与下载权限', tone: 'warning' })
+      return
+    }
+    if (file.size > type.byteLimit) {
+      toast({ title: '文件超出预览大小上限', description: `最多可预览 ${formatBytes(type.byteLimit)}，请下载后打开。`, tone: 'warning' })
+      return
+    }
+    setDialog({ kind: 'preview', file, type })
+  }
+
   function dragOver(event) {
     if (!canUpload || !canTransfer || !event.dataTransfer.types.includes('Files')) return
     event.preventDefault()
@@ -207,7 +220,7 @@ export function FileBrowserPage({ scope }) {
         )}
         <div className="file-row file-row-heading border-y border-line">
           <FileSelection label="全选当前显示的文件" checked={allSelected} mixed={!allSelected && selectedFiles.length > 0} disabled={!files.length} onChange={(checked) => setFilesSelected(files.map(({ fileId }) => fileId), checked)} />
-          <span>文件名称</span><span className="hidden lg:block">大小</span><span className="hidden lg:block">所有者</span><span className="hidden lg:block">{timeLabel}</span><span className="text-right">操作</span>
+          <span>文件名称 <span className="ml-1 hidden text-xs font-normal sm:inline">双击预览</span></span><span className="hidden lg:block">大小</span><span className="hidden lg:block">所有者</span><span className="hidden lg:block">{timeLabel}</span><span className="text-right">操作</span>
         </div>
         {page.loading && !page.items.length ? (
           <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted"><span className="button-spinner text-primary" />正在获取文件…</div>
@@ -215,7 +228,7 @@ export function FileBrowserPage({ scope }) {
           <div className="p-4 sm:p-5"><Alert tone="error" title="无法获取文件" action={<RefreshButton size="sm" label="重试" disabled={!page.ready} loading={page.loading} onClick={page.refresh} />}>{page.error}</Alert></div>
         ) : files.length ? (
           <ul className="divide-y divide-line" aria-label={owned ? '个人文件列表' : '接收文件列表'}>
-            {files.map((file) => <FileRow key={file.fileId} file={file} owned={owned} timeLabel={timeLabel} canDownload={canDownload} canShare={canShare} ready={page.ready} selected={selection.has(file.fileId)} onSelect={(id, checked) => setFilesSelected([id], checked)} onDownload={download} onShare={(entry) => setDialog({ kind: 'share', files: [entry] })} onDelete={(entry) => setDialog({ kind: 'delete', files: [entry] })} />)}
+            {files.map((file) => <FileRow key={file.fileId} file={file} owned={owned} timeLabel={timeLabel} canDownload={canDownload} canShare={canShare} ready={page.ready} selected={selection.has(file.fileId)} onSelect={(id, checked) => setFilesSelected([id], checked)} onDownload={download} onShare={(entry) => setDialog({ kind: 'share', files: [entry] })} onDelete={(entry) => setDialog({ kind: 'delete', files: [entry] })} onPreview={preview} />)}
           </ul>
         ) : search ? <EmptyState icon="search" title="没有匹配的文件" description="试试其他关键词，或加载更多文件继续搜索。" /> : (
           <EmptyState icon={owned ? 'folder' : 'shared'} title={owned ? '还没有文件' : '暂无共享文件'} description={owned ? (canUpload ? '把文件拖到这里，或使用上方的上传按钮。单个文件最大 512 MiB。' : '管理员开通上传权限后，你可以在这里管理个人文件。') : '其他用户授权后，共享文件会显示在这里。'} />
@@ -231,6 +244,7 @@ export function FileBrowserPage({ scope }) {
         <Link to="/transfers" className="ui-link"><Icon name="transfer" size={17} />查看传输中心</Link>
       </div>
 
+      {dialog?.kind === 'preview' && <FilePreviewDialog file={dialog.file} type={dialog.type} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'share' && <ShareDialog files={dialog.files} onClose={() => setDialog(null)} onApplied={clearAppliedSelection} />}
       {dialog?.kind === 'delete' && <DeleteFileDialog files={dialog.files} onClose={() => setDialog(null)} onDeleted={(deleted) => {
         clearAppliedSelection(deleted)

@@ -1,7 +1,7 @@
 import { getErrorMessage, SftError } from '../../services/errors.js'
 import { Type } from '../../services/protocol.js'
 import { fileProblem, IntegrityError, verifyDownload } from './file-data.js'
-import { findUpload, performDownload, performUpload } from './jobs.js'
+import { findUpload, performDownload, performUpload, readVerifiedPreview } from './jobs.js'
 import { createTransferStorage } from './storage.js'
 
 const MAX_ACTIVE = 4
@@ -51,6 +51,7 @@ export class TransferQueue {
   #tasks = new Map()
   #files = new Map()
   #active = new Map()
+  #previews = new Set()
   #editing = new Set()
   #saving = new Set()
   #scheduled = false
@@ -139,6 +140,42 @@ export class TransferQueue {
     })
     this.#schedule()
     return id
+  }
+
+  preview = async (file, byteLimit, signal) => {
+    signal.throwIfAborted()
+    const { fileId } = file
+    const id = `download-${fileId}`
+    if (this.#active.has(id) || this.#previews.has(id)) {
+      throw new Error('此文件正在传输或加载，请稍后重试。')
+    }
+    if (this.#active.size + this.#previews.size >= MAX_ACTIVE) throw new SftError('BUSY', true)
+
+    const epoch = this.#connectionEpoch
+    const checkConnection = () => {
+      if (!this.#online || this.#connectionEpoch !== epoch || this.#controller?.signal.aborted) {
+        throw new SftError('CONNECTION_LOST', true)
+      }
+    }
+    checkConnection()
+    this.#previews.add(id)
+    try {
+      return await readVerifiedPreview((type, options) => {
+        // Wait for the begin reply so a cancelled preview can still release its binding.
+        if (type === Type.GET_BEGIN) return this.#request(type, options)
+        return this.#ask(type, options, signal, checkConnection)
+      }, file, byteLimit, signal)
+    } finally {
+      try {
+        checkConnection()
+        await this.#request(Type.GET_CLOSE, { transferId: fileId, timeoutMs: 3_000 })
+      } catch {
+        // A disconnected socket releases its own bindings.
+      } finally {
+        this.#previews.delete(id)
+        this.#schedule()
+      }
+    }
   }
 
   pause = async (id) => {
@@ -325,10 +362,10 @@ export class TransferQueue {
       this.#scheduled = false
       if (!this.#storage || this.#controller?.signal.aborted) return
       const tasks = [...this.#tasks.values()]
-        .filter((task) => !this.#active.has(task.id) && !this.#editing.has(task.id))
+        .filter((task) => !this.#active.has(task.id) && !this.#editing.has(task.id) && !this.#previews.has(task.id))
         .sort((left, right) => left.createdAt - right.createdAt)
       for (const task of tasks) {
-        if (this.#active.size === MAX_ACTIVE) break
+        if (this.#active.size + this.#previews.size >= MAX_ACTIVE) break
         if (task.status === 'cancel-pending' && (this.#online || task.kind === 'download' || !task.beginAttempted)) this.#startTask(task, 'cancel')
         if (this.#online && task.status === 'queued') this.#startTask(task)
       }

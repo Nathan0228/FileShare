@@ -1,8 +1,9 @@
+import { sha256 } from '@noble/hashes/sha2.js'
 import { decodeBase64Url } from '../../services/encoding.js'
 import { Type } from '../../services/protocol.js'
 import {
   CHUNK_BYTES, MAX_FILE_BYTES, checkChunk, checkStoredChunk, chunkCount,
-  chunkLength, hashFile, makeChunk, verifyDownload,
+  chunkLength, hashFile, hex, IntegrityError, makeChunk, verifyDownload,
 } from './file-data.js'
 
 export async function findUpload(operation) {
@@ -67,14 +68,41 @@ async function sendChunks(operation, transferId, bitmap) {
   })
 }
 
-export async function performDownload(operation) {
-  const { id, fileId } = operation.task
-  const { body: manifest } = await operation.ask(Type.GET_BEGIN, { body: { fileId } })
+async function openDownload(ask, fileId) {
+  const { body: manifest } = await ask(Type.GET_BEGIN, { body: { fileId } })
   if (!manifest || typeof manifest.name !== 'string' || !Number.isSafeInteger(manifest.size) ||
       manifest.size < 0 || manifest.size > MAX_FILE_BYTES || manifest.chunkBytes !== CHUNK_BYTES ||
-      !/^[a-f0-9]{64}$/.test(manifest.sha256)) {
+      typeof manifest.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(manifest.sha256)) {
     throw new Error('服务器返回的下载清单无效。')
   }
+  return manifest
+}
+
+export async function readVerifiedPreview(ask, file, byteLimit, signal) {
+  const { fileId } = file
+  const manifest = await openDownload(ask, fileId)
+  signal.throwIfAborted()
+  const { size, sha256: expectedDigest } = manifest
+  if (size > byteLimit || size !== file.size || manifest.name !== file.name) {
+    throw new Error('预览清单与文件列表不匹配，请刷新列表。')
+  }
+
+  const bytes = new Uint8Array(size)
+  for (let chunkIndex = 0; chunkIndex < chunkCount(size); chunkIndex += 1) {
+    const { body } = await ask(Type.GET_CHUNK, { transferId: fileId, chunkIndex })
+    const { data } = checkChunk(body, size, chunkIndex)
+    bytes.set(data, chunkIndex * CHUNK_BYTES)
+  }
+  signal.throwIfAborted()
+  if (hex(sha256(bytes)) !== expectedDigest) {
+    throw new IntegrityError('整文件完整性校验未通过。')
+  }
+  return bytes
+}
+
+export async function performDownload(operation) {
+  const { id, fileId } = operation.task
+  const manifest = await openDownload(operation.ask, fileId)
   if (operation.task.sha256 && (operation.task.sha256 !== manifest.sha256 || operation.task.size !== manifest.size)) {
     await operation.storage.deleteChunks(id)
   }
@@ -101,9 +129,9 @@ export async function performDownload(operation) {
   await operation.update({ completedBytes })
   await transferInPairs(operation, missing, async (chunkIndex) => {
     const { body } = await operation.ask(Type.GET_CHUNK, { transferId: fileId, chunkIndex })
-    const { digest, blob } = checkChunk(body, size, chunkIndex)
-    await operation.storage.putChunk(id, chunkIndex, digest, blob)
-    return blob.size
+    const { digest, data } = checkChunk(body, size, chunkIndex)
+    await operation.storage.putChunk(id, chunkIndex, digest, new Blob([data]))
+    return data.length
   })
 
   operation.checkpoint()

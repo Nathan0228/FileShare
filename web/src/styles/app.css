@@ -51,6 +51,19 @@
   .ui-modal { @apply m-auto max-h-[calc(100dvh-2rem)] max-w-none rounded-2xl border border-line bg-white p-0 shadow-xl; width: min(calc(100% - 2rem), 34rem); }
   .ui-modal::backdrop { background: #0f29218a; backdrop-filter: blur(3px); }
   .ui-modal-content { @apply p-5 sm:p-6; }
+  .ui-modal-wide { width: min(calc(100% - 2rem), 58rem); }
+  .markdown-preview { @apply space-y-3 text-sm leading-relaxed wrap-anywhere text-ink sm:text-base; }
+  .markdown-preview :is(h1, h2, h3, h4, h5, h6) { @apply mt-4 font-bold; }
+  .markdown-preview h1 { @apply text-2xl; }
+  .markdown-preview h2 { @apply text-xl; }
+  .markdown-preview ul { @apply list-disc ps-6; }
+  .markdown-preview ol { @apply list-decimal ps-6; }
+  .markdown-preview a { @apply text-primary underline underline-offset-2; }
+  .markdown-preview blockquote { @apply border-s-3 border-line ps-4 text-muted; }
+  .markdown-preview pre { @apply overflow-x-auto rounded-lg bg-canvas p-3; }
+  .markdown-preview :not(pre) > code { @apply rounded bg-canvas px-1; }
+  .markdown-preview td, .markdown-preview th { @apply border border-line px-2.5 py-1.5 text-start; }
+  .markdown-preview th { @apply bg-canvas; }
   .ui-hint { @apply relative inline-flex align-middle; }
   .ui-hint-trigger { @apply inline-flex min-h-7 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium text-muted hover:bg-mint hover:text-primary; }
   .ui-tooltip {

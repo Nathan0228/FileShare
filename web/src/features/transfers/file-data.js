@@ -67,7 +67,7 @@ export function checkChunk(body, size, index) {
   const data = body.subarray(DIGEST_BYTES)
   const digest = hex(body.subarray(0, DIGEST_BYTES))
   if (hex(sha256(data)) !== digest) throw new IntegrityError('文件分片完整性校验未通过。')
-  return { digest, blob: new Blob([data]) }
+  return { digest, data }
 }
 
 export async function checkStoredChunk(chunk, size, index) {

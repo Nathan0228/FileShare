@@ -17,6 +17,7 @@ export function TransferProvider({ children }) {
     ...snapshot,
     enqueueUploads: queue.enqueueUploads,
     enqueueDownload: queue.enqueueDownload,
+    preview: queue.preview,
     pause: queue.pause,
     resume: queue.resume,
     reselect: queue.reselect,

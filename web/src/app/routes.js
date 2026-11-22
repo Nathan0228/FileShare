@@ -2,6 +2,7 @@ export const workspaceLinks = [
   { to: '/files', label: '我的文件', icon: 'files' },
   { to: '/shared', label: '共享给我', icon: 'shared' },
   { to: '/shares', label: '我发出的共享', icon: 'link' },
+  { to: '/friends', label: '好友列表', icon: 'users' },
   { to: '/transfers', label: '传输中心', icon: 'transfer' },
 ]
 

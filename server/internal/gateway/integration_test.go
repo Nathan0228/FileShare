@@ -83,6 +83,7 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	assertCode(t, request, "UNAUTH")
 	assertCode(t, up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, nil), "UNAUTH")
 	assertCode(t, up.request(wire.OutgoingShares, wire.ID{}, wire.NoChunk, map[string]string{"view": "active"}), "UNAUTH")
+	assertCode(t, up.request(wire.Friends, wire.ID{}, wire.NoChunk, map[string]any{}), "UNAUTH")
 	up.attach(ownerToken)
 	self := up.request(wire.UserProfile, wire.ID{}, wire.NoChunk, nil)
 	assertKind(t, self, wire.UserProfileOK)
@@ -210,6 +211,11 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	assertCode(t, down.request(wire.GetBegin, wire.ID{}, wire.NoChunk, file), "DENIED")
 	share := map[string]any{"fileId": done.FileID, "grantee": grantee, "allow": true}
 	assertKind(t, up.request(wire.ShareSet, wire.ID{}, wire.NoChunk, share), wire.OK)
+	assertFriends(t, up)
+	assertFriends(t, down)
+	friendID := strings.TrimPrefix(grantee, "gateway-")
+	note := map[string]string{"friendId": friendID, "note": "项目伙伴"}
+	assertCode(t, up.request(wire.FriendNote, wire.ID{}, wire.NoChunk, note), "DENIED")
 	grant := store.OutgoingShare{FileID: done.FileID.String(), Name: "resume.bin", Grantee: grantee, Action: "grant"}
 	assertOutgoingShares(t, up, "active", grant)
 	assertOutgoingShares(t, up, "history", grant)
@@ -243,8 +249,62 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	grant.Deleted = true
 	assertOutgoingShares(t, up, "active")
 	assertOutgoingShares(t, up, "history", revoke, grant)
+	reverseOp, err := wire.NewID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyDigest := sha256.Sum256(nil)
+	reverseUpload := down.request(wire.PutBegin, wire.ID{}, wire.NoChunk, map[string]any{
+		"opId": reverseOp, "name": "return.txt", "size": 0, "sha256": hex.EncodeToString(emptyDigest[:]),
+	})
+	assertKind(t, reverseUpload, wire.PutReady)
+	reverseCommit := down.request(wire.PutCommit, reverseUpload.TransferID, wire.NoChunk, nil)
+	assertKind(t, reverseCommit, wire.PutDone)
+	var reverse struct{ FileID wire.ID }
+	if err := json.Unmarshal(reverseCommit.Body, &reverse); err != nil || reverse.FileID == (wire.ID{}) {
+		t.Fatalf("bad reverse PUT_DONE: %s (%v)", reverseCommit.Body, err)
+	}
+	multiple := map[string]any{"fileId": reverse.FileID, "grantees": []string{owner, "absent-" + owner}, "allow": true}
+	assertCode(t, down.request(wire.ShareSet, wire.ID{}, wire.NoChunk, multiple), "DENIED")
+	assertOutgoingShares(t, down, "active")
+	assertFriends(t, up)
+	multiple["grantees"] = []string{owner, newUser}
+	assertKind(t, down.request(wire.ShareSet, wire.ID{}, wire.NoChunk, multiple), wire.OK)
+	assertOutgoingShares(t, down, "history",
+		store.OutgoingShare{FileID: reverse.FileID.String(), Name: "return.txt", Grantee: newUser, Action: "grant"},
+		store.OutgoingShare{FileID: reverse.FileID.String(), Name: "return.txt", Grantee: owner, Action: "grant"})
+	ownerID := strings.TrimPrefix(owner, "gateway-")
+	friend := store.Friend{UserID: friendID, Username: grantee, Enabled: true}
+	assertFriends(t, up, friend)
+	assertKind(t, up.request(wire.FriendNote, wire.ID{}, wire.NoChunk, note), wire.OK)
+	friend.Note = note["note"]
+	assertFriends(t, up, friend)
+	assertFriends(t, down, store.Friend{UserID: ownerID, Username: owner, Enabled: true})
+	multiple["allow"] = false
+	assertKind(t, down.request(wire.ShareSet, wire.ID{}, wire.NoChunk, multiple), wire.OK)
+	assertOutgoingShares(t, down, "active")
+	assertFriends(t, up, friend)
+	note["note"] = ""
+	assertKind(t, up.request(wire.FriendNote, wire.ID{}, wire.NoChunk, note), wire.OK)
+	friend.Note = ""
+	assertFriends(t, up, friend)
 	assertKind(t, up.request(wire.Logout, wire.ID{}, wire.NoChunk, nil), wire.OK)
 	assertCode(t, connect().request(wire.SessionAttach, wire.ID{}, wire.NoChunk, map[string]string{"token": ownerToken}), "UNAUTH")
+}
+
+func assertFriends(t *testing.T, conn *testConn, want ...store.Friend) {
+	t.Helper()
+	reply := conn.request(wire.Friends, wire.ID{}, wire.NoChunk, map[string]any{})
+	assertKind(t, reply, wire.FriendsOK)
+	var page store.Page[store.Friend]
+	if err := json.Unmarshal(reply.Body, &page); err != nil || len(page.Items) != len(want) || page.NextCursor != nil {
+		t.Fatalf("unexpected friend page: %s (%v)", reply.Body, err)
+	}
+	for i, item := range page.Items {
+		if item != want[i] {
+			t.Fatalf("friend %d: got %+v, want %+v", i, item, want[i])
+		}
+	}
 }
 
 func assertOutgoingShares(t *testing.T, conn *testConn, view string, want ...store.OutgoingShare) {

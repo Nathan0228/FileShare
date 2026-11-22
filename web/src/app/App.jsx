@@ -6,6 +6,7 @@ import { SessionProvider } from '../features/auth/SessionProvider.jsx'
 import { useSession } from '../features/auth/session.js'
 import { ToastProvider } from '../features/feedback/ToastProvider.jsx'
 import { FileBrowserPage } from '../features/files/FileBrowserPage.jsx'
+import { FriendsPage } from '../features/friends/FriendsPage.jsx'
 import { OutgoingSharesPage } from '../features/shares/OutgoingSharesPage.jsx'
 import { TransferPage, TransferProvider } from '../features/transfers/index.js'
 import NotFound from './NotFound.jsx'
@@ -59,6 +60,7 @@ export default function App() {
                 <Route path="/files" element={<FileBrowserPage key="owned" scope="owned" />} />
                 <Route path="/shared" element={<FileBrowserPage key="shared" scope="shared" />} />
                 <Route path="/shares" element={<OutgoingSharesPage />} />
+                <Route path="/friends" element={<FriendsPage />} />
                 <Route path="/transfers" element={<TransferPage />} />
                 <Route path="/admin" element={<RequireAdmin />}>
                   <Route index element={<Navigate replace to="/admin/users" />} />

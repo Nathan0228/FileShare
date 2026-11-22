@@ -26,6 +26,9 @@ const adminQuotaBytes = 8 << 30
 //go:embed schema.sql
 var schema string
 
+//go:embed friends.sql
+var friendsMigration string
+
 type Store struct {
 	DB        *sql.DB
 	cursorKey [32]byte
@@ -85,19 +88,32 @@ func New(db *sql.DB) *Store {
 // Migrate runs the versioned schema with a connection-scoped MariaDB lock.
 func (s *Store) Migrate(ctx context.Context) error {
 	return s.withLock(ctx, "sft:v1:migrate", func(conn *sql.Conn) error {
-		for i, statement := range strings.Split(schema, ";") {
-			statement = strings.TrimSpace(statement)
-			if statement == "" {
-				continue
-			}
-			if _, err := conn.ExecContext(ctx, statement); err != nil {
-				return fmt.Errorf("apply MariaDB migration 1 statement %d: %w", i+1, err)
-			}
+		if err := applyMigration(ctx, conn, 1, schema); err != nil {
+			return err
 		}
-		_, err := conn.ExecContext(ctx, `INSERT INTO schema_migrations (version)
-			VALUES (1) ON DUPLICATE KEY UPDATE version=version`)
-		return err
+		var applied bool
+		if err := conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=2)`).Scan(&applied); err != nil {
+			return err
+		}
+		if applied {
+			return nil
+		}
+		return applyMigration(ctx, conn, 2, friendsMigration)
 	})
+}
+
+func applyMigration(ctx context.Context, conn *sql.Conn, version int, script string) error {
+	for i, statement := range strings.Split(script, ";") {
+		if statement = strings.TrimSpace(statement); statement == "" {
+			continue
+		}
+		if _, err := conn.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("apply MariaDB migration %d statement %d: %w", version, i+1, err)
+		}
+	}
+	_, err := conn.ExecContext(ctx, `INSERT INTO schema_migrations (version)
+		VALUES (?) ON DUPLICATE KEY UPDATE version=version`, version)
+	return err
 }
 
 // withLock keeps the lock and the work on one connection. Named locks are

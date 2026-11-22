@@ -90,11 +90,13 @@ ff ff ff ff
 | `07 SESSION_ATTACH` | `{token}` | `06 AUTH_OK` · `{userId,role,permissions,token}` |
 | `08 LOGOUT` | 空 | `7D OK` |
 | `10 LIST` | `{scope,cursor}`，`scope` 为 `owned` 或 `shared` | `11 LIST_OK` · `{items,nextCursor}` |
-| `12 SHARE_SET` | `{fileId,grantee,allow}`，`grantee` 为账号名，`allow` 为布尔值 | `7D OK` |
+| `12 SHARE_SET` | `{fileId,grantee,allow}` 或 `{fileId,grantees,allow}`，`allow` 为布尔值 | `7D OK` |
 | `13 ADMIN` | `{action,...}`，见管理员接口 | `7D OK`，载荷取决于操作 |
 | `14 FILE_DELETE` | `{fileId}` | `7D OK` |
 | `15 USER_PROFILE` | 空 | `16 USER_PROFILE_OK` · `{userId,username,role,permissions,quotaBytes,usedBytes,reservedBytes}` |
 | `17 OUTGOING_SHARES` | `{view,cursor}`，`view` 为 `active` 或 `history` | `18 OUTGOING_SHARES_OK` · `{items,nextCursor}` |
+| `19 FRIENDS` | `{cursor}`，首个游标可省略 | `1A FRIENDS_OK` · `{items,nextCursor}` |
+| `1B FRIEND_NOTE` | `{friendId,note}` | `7D OK` |
 | `20 PUT_BEGIN` | `{opId,name,size,sha256}` | `21 PUT_READY` · `{size,sha256,chunkBytes,state}`，报头返回上传 ID |
 | `22 PUT_DATA` | 分片摘要与数据 | `7D OK`，报头回显上传 ID 和索引 |
 | `23 PUT_STATUS` | 空 | `24 PUT_STATE` · `{state,bitmap,fileId}`，未发布时 `fileId` 为 `null` |
@@ -126,7 +128,13 @@ ff ff ff ff
 
 `OUTGOING_SHARES` 只返回当前会话账号发出的共享，条目为 `{fileId,name,grantee,action,createdAt,deleted}`。`active` 返回调用者拥有的未删除文件的当前授权条目，`action` 为 `grant`，`createdAt` 为授权时间。接收者实际下载时仍需通过账号和下载权限检查。`history` 按最新操作优先返回近 30 天的成功授权及撤销，`action` 为 `grant` 或 `revoke`。已删除文件的历史可显示 `deleted:true`。查询游标与当前账号和视图绑定。
 
-前端对选中的文件逐项发送原有请求。批量下载将文件逐一加入传输队列。批量共享或撤销使用 `SHARE_SET`，批量删除使用 `FILE_DELETE`。单项成功立即生效，失败项可单独重试。
+`SHARE_SET` 接受单个账号名 `grantee`，或包含 1 到 20 个唯一账号名的 `grantees`。每次请求只指定一个文件，所有账号的授权或撤销在同一事务内生效，事务也逐个记录接收者的审计事件。账号不存在、向自己操作、授权给已停用账号或无权管理文件时返回 `DENIED`。批量共享多个文件时，前端逐文件发出请求，已成功文件立即生效，失败文件可单独重试。批量下载将文件逐一加入传输队列，批量删除逐文件调用 `FILE_DELETE`。
+
+### 好友与备注
+
+`FRIENDS` 按账号名返回当前用户的好友，条目为 `{userId,username,note,enabled}`。双方各自至少成功授予过对方一次文件读权限后，关系自动成立。关系记录独立于文件权限，撤销、删除文件和清理审计后仍保留。数据库迁移 2 从现有授权以及仍保留的成功授权审计中恢复历史记录。
+
+`FRIEND_NOTE` 的 `friendId` 必须是当前账号的好友 ID。备注仅对保存它的账号可见。服务端去掉首尾空白，接收最多 80 个 Unicode 字符的单行文本，空字符串用于清除备注。变更仅更新当前账号对该好友的备注。
 
 ### 管理员接口
 

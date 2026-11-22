@@ -118,6 +118,27 @@ func (c *connection) control(ctx context.Context, m wire.Message, actor auth.Ide
 		}
 		page, err := c.gateway.store.OutgoingShares(ctx, user, req.View, req.Cursor)
 		return jsonReply(m, wire.OutgoingSharesOK, page), err
+	case wire.Friends:
+		var req struct {
+			Cursor *string `json:"cursor"`
+		}
+		if err := wire.JSON(m.Body, &req); err != nil {
+			return wire.Message{}, err
+		}
+		page, err := c.gateway.store.Friends(ctx, user, req.Cursor)
+		return jsonReply(m, wire.FriendsOK, page), err
+	case wire.FriendNote:
+		var req struct {
+			FriendID wire.ID `json:"friendId"`
+			Note     *string `json:"note"`
+		}
+		if err := wire.JSON(m.Body, &req); err != nil {
+			return wire.Message{}, err
+		}
+		if req.FriendID == (wire.ID{}) || req.Note == nil {
+			return wire.Message{}, wire.E("BAD_REQUEST", false)
+		}
+		return ok, c.gateway.store.SetFriendNote(ctx, user, req.FriendID, *req.Note)
 	case wire.List:
 		var req struct {
 			Scope  string  `json:"scope"`
@@ -130,17 +151,21 @@ func (c *connection) control(ctx context.Context, m wire.Message, actor auth.Ide
 		return jsonReply(m, wire.ListOK, page), err
 	case wire.ShareSet:
 		var req struct {
-			FileID  wire.ID `json:"fileId"`
-			Grantee string  `json:"grantee"`
-			Allow   *bool   `json:"allow"`
+			FileID   wire.ID   `json:"fileId"`
+			Grantee  *string   `json:"grantee"`
+			Grantees *[]string `json:"grantees"`
+			Allow    *bool     `json:"allow"`
 		}
 		if err := wire.JSON(m.Body, &req); err != nil {
 			return wire.Message{}, err
 		}
-		if req.FileID == (wire.ID{}) || req.Allow == nil {
+		if req.FileID == (wire.ID{}) || req.Allow == nil || (req.Grantee == nil) == (req.Grantees == nil) {
 			return wire.Message{}, wire.E("BAD_REQUEST", false)
 		}
-		return ok, c.gateway.store.ShareSet(ctx, user, req.FileID, req.Grantee, *req.Allow)
+		if req.Grantee != nil {
+			return ok, c.gateway.store.ShareSet(ctx, user, req.FileID, *req.Grantee, *req.Allow)
+		}
+		return ok, c.gateway.store.ShareMany(ctx, user, req.FileID, *req.Grantees, *req.Allow)
 	case wire.Admin:
 		result, err := c.gateway.store.Admin(ctx, user, m.Body)
 		return jsonReply(m, wire.OK, result), err

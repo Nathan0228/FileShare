@@ -44,6 +44,9 @@ const (
 	UserProfileOK    Kind = 0x16
 	OutgoingShares   Kind = 0x17
 	OutgoingSharesOK Kind = 0x18
+	Friends          Kind = 0x19
+	FriendsOK        Kind = 0x1a
+	FriendNote       Kind = 0x1b
 	PutBegin         Kind = 0x20
 	PutReady         Kind = 0x21
 	PutData          Kind = 0x22
@@ -147,7 +150,7 @@ func (m Message) Encode() []byte {
 func (m Message) ValidateRequest() error {
 	var hasID, hasChunk, data, empty bool
 	switch m.Kind {
-	case EnrollBegin, EnrollFinish, AuthBegin, AuthFinish, SessionAttach, List, ShareSet, Admin, FileDelete, OutgoingShares, PutBegin, GetBegin:
+	case EnrollBegin, EnrollFinish, AuthBegin, AuthFinish, SessionAttach, List, ShareSet, Admin, FileDelete, OutgoingShares, Friends, FriendNote, PutBegin, GetBegin:
 	case Logout, UserProfile:
 		empty = true
 	case PutData:

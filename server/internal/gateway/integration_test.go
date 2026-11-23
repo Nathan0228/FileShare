@@ -131,12 +131,50 @@ func TestWebSocketResumeAndRevocation(t *testing.T) {
 	if err := json.Unmarshal(users.Body, &userPage); err != nil || len(userPage.Items) != 0 {
 		t.Fatalf("ordinary-user filter returned an administrator: %s (%v)", users.Body, err)
 	}
-	invitation := admin.request(wire.Admin, wire.ID{}, wire.NoChunk, map[string]any{"action": "invite", "username": newUser})
-	assertKind(t, invitation, wire.OK)
-	var invite struct{ InviteToken string }
-	if err := json.Unmarshal(invitation.Body, &invite); err != nil || len(invite.InviteToken) != 43 {
-		t.Fatal("invalid registration invitation")
+	inviteRequest := map[string]any{"action": "invite", "username": newUser}
+	checkInvite := func(ttl time.Duration) (token string, digest [32]byte) {
+		t.Helper()
+		earliest := time.Now().UTC().Truncate(time.Microsecond).Add(ttl)
+		reply := admin.request(wire.Admin, wire.ID{}, wire.NoChunk, inviteRequest)
+		assertKind(t, reply, wire.OK)
+		var invite struct {
+			InviteToken string
+			ExpiresAt   time.Time
+		}
+		if err := json.Unmarshal(reply.Body, &invite); err != nil {
+			t.Fatal("invalid invitation response")
+		}
+		raw, err := base64.RawURLEncoding.Strict().DecodeString(invite.InviteToken)
+		if err != nil || len(raw) != 32 || invite.ExpiresAt.Before(earliest) || invite.ExpiresAt.After(time.Now().Add(ttl)) {
+			t.Fatalf("invalid invitation or expiry %v for duration %v", invite.ExpiresAt, ttl)
+		}
+		digest = sha256.Sum256(raw)
+		var stored time.Time
+		if err := db.DB.QueryRowContext(ctx, "SELECT expires_at FROM invites WHERE token_hash=?", digest[:]).Scan(&stored); err != nil || !stored.Equal(invite.ExpiresAt) {
+			t.Fatalf("stored expiry %v differs from API expiry %v (%v)", stored, invite.ExpiresAt, err)
+		}
+		return invite.InviteToken, digest
 	}
+	oldToken, _ := checkInvite(15 * time.Minute)
+	for _, invalid := range []any{0, -1, 43201, 1.5, "60"} {
+		inviteRequest["ttlMinutes"] = invalid
+		assertCode(t, admin.request(wire.Admin, wire.ID{}, wire.NoChunk, inviteRequest), "BAD_REQUEST")
+	}
+	enrollment := connect()
+	beginEnrollment := func(token string) wire.Message {
+		return enrollment.request(wire.EnrollBegin, wire.ID{}, wire.NoChunk, map[string]string{"inviteToken": token})
+	}
+	assertKind(t, beginEnrollment(oldToken), wire.Challenge)
+	inviteRequest["ttlMinutes"] = 7 * 24 * 60
+	assertCode(t, up.request(wire.Admin, wire.ID{}, wire.NoChunk, inviteRequest), "DENIED")
+	token, inviteDigest := checkInvite(7 * 24 * time.Hour)
+	assertCode(t, beginEnrollment(oldToken), "UNAUTH")
+	assertKind(t, beginEnrollment(token), wire.Challenge)
+	if _, err := db.DB.ExecContext(ctx, "UPDATE invites SET expires_at=UTC_TIMESTAMP(6)-INTERVAL 1 SECOND WHERE token_hash=?", inviteDigest[:]); err != nil {
+		t.Fatal(err)
+	}
+	assertCode(t, beginEnrollment(token), "UNAUTH")
+	enrollment.ws.Close()
 	admin.ws.Close()
 
 	first := bytes.Repeat([]byte{0x42}, wire.ChunkBytes)

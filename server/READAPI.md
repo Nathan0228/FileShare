@@ -144,7 +144,7 @@ ff ff ff ff
 | --- | --- | --- |
 | `create` | `username` | 空 OK。新账号启用，初始权限为空，配额为 0 |
 | `setAccess` | `username,enabled,permissions,quotaBytes` | 空 OK。配额为 0 到 2^50 字节整数，并须覆盖已用和预留字节。禁用账号时撤销其会话和待消费邀请 |
-| `invite` | `username` | `{inviteToken}`。对启用账号签发 15 分钟有效的一次性邀请，并替换该账号以前尚未消费的邀请 |
+| `invite` | `username`，可选 `ttlMinutes` | `{inviteToken,expiresAt}`。对已启用的普通用户签发一次性邀请，并替换该账号以前尚未使用的邀请 |
 | `revokeCredential` | `username,credentialId` | 空 OK。凭据 ID 为 base64url，同步撤销由该凭据建立的会话 |
 | `users` | `cursor`，可选 `role` 和 `search` | `{items,nextCursor}`，条目为 `{userId,username,role,enabled,permissions,quotaBytes,usedBytes,reservedBytes,createdAt}`，`createdAt` 是 RFC 3339 UTC 格式的账号创建时间 |
 | `credentials` | `username,cursor` | `{items,nextCursor}`，条目为 `{credentialId,createdAt,revokedAt}` |
@@ -153,6 +153,8 @@ ff ff ff ff
 审计 `id` 是十进制字符串，时间为 RFC 3339 UTC 字符串，缺省的撤销时间、操作者、目标和附加信息为 `null`。引导管理员的初始配额为 8 GiB。管理员可先用 `create` 创建用户，再用 `setAccess` 下发权限与配额，最后用 `invite` 签发登记邀请。
 
 `users` 的 `role` 可选 `admin` 或 `user`。`role` 为 `user` 时可以用 `search` 按用户名中包含的文字搜索。搜索词去除首尾空格后按不区分大小写的方式匹配，最多 64 个 ASCII 字母、数字、点、下划线或连字符。更改角色或搜索词后，从空游标开始请求。
+
+`invite` 的 `ttlMinutes` 默认 15 分钟，可设置为 1 至 43200 的整数（最多 30 天）。例如，设置 `ttlMinutes: 1440` 可签发有效期为 1 天的邀请。`expiresAt` 是服务端计算的 RFC 3339 UTC 到期时间。审计记录请求的有效期（分钟）。
 
 ### 上传、确认与续传
 

@@ -2,10 +2,10 @@ services:
   mariadb:
     image: mariadb:11.4
     environment:
-      MARIADB_ROOT_PASSWORD: 361121
+      MARIADB_ROOT_PASSWORD: ${Mariadb_Root_Password:?set Mariadb_Root_Password}
       MARIADB_DATABASE: sft
       MARIADB_USER: sft
-      MARIADB_PASSWORD: 361121
+      MARIADB_PASSWORD: ${Mariadb_Root_Password:?set Mariadb_Root_Password}
     volumes:
       - mariadb-data:/var/lib/mysql
     healthcheck:
@@ -24,7 +24,7 @@ services:
       SFT_DB_ADDR: mariadb:3306
       SFT_DB_NAME: sft
       SFT_DB_USER: sft
-      SFT_DB_PASSWORD: 361121
+      SFT_DB_PASSWORD: ${Mariadb_Root_Password:?set Mariadb_Root_Password}
       SFT_LISTEN_ADDR: 0.0.0.0:8080
       SFT_STORAGE_ROOT: /srv/sft
       SFT_ORIGIN: http://localhost:5173

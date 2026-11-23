@@ -133,23 +133,31 @@ func recordAudit(ctx context.Context, tx *sql.Tx, actor []byte, action string, t
 	return err
 }
 
-func issueInvite(ctx context.Context, tx *sql.Tx, id wire.ID) (string, error) {
+const defaultInviteMinutes = 15
+
+type issuedInvite struct {
+	Token     string    `json:"inviteToken"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+func issueInvite(ctx context.Context, tx *sql.Tx, id wire.ID, ttl time.Duration) (issuedInvite, error) {
 	var raw [32]byte
 	if _, err := rand.Read(raw[:]); err != nil {
-		return "", err
+		return issuedInvite{}, err
 	}
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Microsecond)
 	if _, err := tx.ExecContext(ctx, `UPDATE invites SET revoked_at=?
 		WHERE user_id=? AND consumed_at IS NULL AND revoked_at IS NULL`, now, id[:]); err != nil {
-		return "", err
+		return issuedInvite{}, err
 	}
 	digest := sha256.Sum256(raw[:])
+	expiresAt := now.Add(ttl)
 	_, err := tx.ExecContext(ctx, `INSERT INTO invites (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
-		digest[:], id[:], now.Add(15*time.Minute))
+		digest[:], id[:], expiresAt)
 	if err != nil {
-		return "", err
+		return issuedInvite{}, err
 	}
-	return base64.RawURLEncoding.EncodeToString(raw[:]), nil
+	return issuedInvite{Token: base64.RawURLEncoding.EncodeToString(raw[:]), ExpiresAt: expiresAt}, nil
 }
 
 // Bootstrap issues a first-use invitation for the initial administrator. A
@@ -201,10 +209,11 @@ func (s *Store) Bootstrap(ctx context.Context, username string) (string, error) 
 				return errors.New("the initial administrator has already enrolled a credential")
 			}
 		}
-		token, err = issueInvite(ctx, tx, id)
+		invite, err := issueInvite(ctx, tx, id, defaultInviteMinutes*time.Minute)
 		if err != nil {
 			return err
 		}
+		token = invite.Token
 		if err := recordAudit(ctx, tx, nil, "admin.bootstrap", id[:], nil); err != nil {
 			return err
 		}

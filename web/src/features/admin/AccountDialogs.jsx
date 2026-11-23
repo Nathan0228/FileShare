@@ -143,26 +143,47 @@ export function EditAccessDialog({ user, onClose, onSuccess }) {
   )
 }
 
+const defaultInviteMinutes = 15
+const maxInviteMinutes = 30 * 24 * 60
+const inviteExpiryFormat = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+})
+
 export function InviteAccountDialog({ user, onClose }) {
-  const [token, setToken] = useState('')
+  const formId = useId()
+  const unitId = useId()
+  const [duration, setDuration] = useState(String(defaultInviteMinutes))
+  const [minutesPerUnit, setMinutesPerUnit] = useState(1)
+  const [invite, setInvite] = useState(null)
   const [copyError, setCopyError] = useState(false)
   const input = useRef(null)
   const { pending, error, setError, perform } = useAdminMutation()
   const toast = useToast()
+  const maxDuration = maxInviteMinutes / minutesPerUnit
 
-  async function createInvite() {
-    const { succeeded, body } = await perform('invite', { username: user.username })
+  async function createInvite(event) {
+    event.preventDefault()
+    const amount = Number(duration)
+    if (!Number.isInteger(amount) || amount < 1 || amount > maxDuration) {
+      setError(`请输入 1 至 ${maxDuration} 的整数。`)
+      return
+    }
+    const ttlMinutes = amount * minutesPerUnit
+    const params = { username: user.username }
+    if (ttlMinutes !== defaultInviteMinutes) params.ttlMinutes = ttlMinutes
+    const { succeeded, body } = await perform('invite', params)
     if (!succeeded) return
     if (!/^[A-Za-z0-9_-]{43}$/.test(body?.inviteToken ?? '')) {
       setError('服务未返回有效的邀请令牌。')
       return
     }
-    setToken(body.inviteToken)
+    const expiresAt = typeof body.expiresAt === 'string' && Number.isFinite(Date.parse(body.expiresAt)) ? body.expiresAt : null
+    setInvite({ token: body.inviteToken, expiresAt })
   }
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(token)
+      await navigator.clipboard.writeText(invite.token)
       setCopyError(false)
       toast({ title: '邀请令牌已复制', tone: 'success' })
     } catch {
@@ -178,7 +199,7 @@ export function InviteAccountDialog({ user, onClose }) {
       onClose={() => !pending && onClose()}
       title="签发登记邀请"
       description={`账号 ${user.username}`}
-      footer={token ? (
+      footer={invite ? (
         <>
           <Button variant="secondary" onClick={onClose}>关闭</Button>
           <Button icon="copy" onClick={copy}>复制令牌</Button>
@@ -186,17 +207,39 @@ export function InviteAccountDialog({ user, onClose }) {
       ) : (
         <>
           <Cancel pending={pending} onClose={onClose} />
-          <Button busy={pending} onClick={createInvite}>{pending ? '生成中…' : '生成邀请'}</Button>
+          <Button type="submit" form={formId} busy={pending}>{pending ? '生成中…' : '生成邀请'}</Button>
         </>
       )}
     >
       <div className="space-y-3">
-        {token ? (
+        {invite ? (
           <>
-            <Field label="一次性邀请令牌" ref={input} value={token} readOnly className="[&_input]:font-mono" onFocus={(event) => event.target.select()} />
+            <Field label="一次性邀请令牌" ref={input} value={invite.token} readOnly className="[&_input]:font-mono" onFocus={(event) => event.target.select()} />
+            {invite.expiresAt && (
+              <p className="text-sm text-slate-700">
+                到期时间 <time dateTime={invite.expiresAt} className="font-medium">{inviteExpiryFormat.format(new Date(invite.expiresAt))}</time>
+              </p>
+            )}
             <p className="text-sm leading-6 text-slate-500">请通过可信渠道将令牌交给用户。用户可在登录页用它登记 Passkey。</p>
           </>
-        ) : <p className="text-sm leading-6 text-slate-600">邀请有效期为 15 分钟。生成后会替换该账号尚未使用的邀请。</p>}
+        ) : (
+          <form id={formId} onSubmit={createInvite} className="space-y-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-3">
+              <Field label="有效期" type="number" min={1} max={maxDuration} step={1} inputMode="numeric" required
+                disabled={pending} value={duration} onChange={(event) => { setDuration(event.target.value); setError('') }} />
+              <div className="space-y-2">
+                <label htmlFor={unitId} className="block text-sm font-semibold text-ink">单位</label>
+                <select id={unitId} className="ui-input" disabled={pending} value={minutesPerUnit}
+                  onChange={(event) => { setMinutesPerUnit(Number(event.target.value)); setError('') }}>
+                  <option value={1}>分钟</option>
+                  <option value={60}>小时</option>
+                  <option value={1440}>天</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-sm leading-6 text-slate-600">最长 30 天，按所选单位填写整数。重新签发会替换该账号尚未使用的邀请。</p>
+          </form>
+        )}
         {copyError && <Alert tone="warning" title="请手动复制">浏览器未授予剪贴板权限，令牌已选中。</Alert>}
         <ActionError text={error} />
       </div>

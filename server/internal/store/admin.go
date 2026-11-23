@@ -19,6 +19,13 @@ type usernameRequest struct {
 	Username string `json:"username"`
 }
 
+const maxInviteMinutes = 30 * 24 * 60
+
+type inviteRequest struct {
+	usernameRequest
+	TTLMinutes *uint32 `json:"ttlMinutes"`
+}
+
 type accessRequest struct {
 	usernameRequest
 	Enabled     *bool     `json:"enabled"`
@@ -79,7 +86,7 @@ func (s *Store) Admin(ctx context.Context, actor wire.ID, payload []byte) (any, 
 		return nil, wire.E("BAD_REQUEST", false)
 	}
 	switch envelope.Action {
-	case "create", "invite":
+	case "create":
 		var request usernameRequest
 		if err := wire.JSON(payload, &request); err != nil {
 			return nil, err
@@ -87,7 +94,23 @@ func (s *Store) Admin(ctx context.Context, actor wire.ID, payload []byte) (any, 
 		if !ValidUsername(request.Username) {
 			return nil, wire.E("BAD_REQUEST", false)
 		}
-		return s.accountAction(ctx, actor, request)
+		return nil, s.createAccount(ctx, actor, request.Username)
+	case "invite":
+		var request inviteRequest
+		if err := wire.JSON(payload, &request); err != nil {
+			return nil, err
+		}
+		if !ValidUsername(request.Username) {
+			return nil, wire.E("BAD_REQUEST", false)
+		}
+		minutes := uint32(defaultInviteMinutes)
+		if request.TTLMinutes != nil {
+			minutes = *request.TTLMinutes
+		}
+		if minutes < 1 || minutes > maxInviteMinutes {
+			return nil, wire.E("BAD_REQUEST", false)
+		}
+		return s.inviteAccount(ctx, actor, request.Username, time.Duration(minutes)*time.Minute)
 	case "setAccess":
 		var request accessRequest
 		if err := wire.JSON(payload, &request); err != nil {
@@ -171,49 +194,55 @@ func beginAdmin(ctx context.Context, db *sql.DB, actor wire.ID) (*sql.Tx, error)
 	return tx, nil
 }
 
-func (s *Store) accountAction(ctx context.Context, actor wire.ID, request usernameRequest) (any, error) {
+func (s *Store) createAccount(ctx context.Context, actor wire.ID, username string) error {
 	tx, err := beginAdmin(ctx, s.DB, actor)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tx.Rollback()
-	if request.Action == "create" {
-		id, err := wire.NewID()
-		if err != nil {
-			return nil, err
-		}
-		_, err = tx.ExecContext(ctx, "INSERT INTO users (id, username, role) VALUES (?, ?, 'user')", id[:], request.Username)
-		if duplicate(err) {
-			return nil, wire.E("CONFLICT", false)
-		}
-		if err != nil {
-			return nil, err
-		}
-		if err := recordAudit(ctx, tx, actor[:], "account.create", id[:], nil); err != nil {
-			return nil, err
-		}
-		return nil, tx.Commit()
-	}
-	target, err := lockUsername(ctx, tx, request.Username)
+	id, err := wire.NewID()
 	if err != nil {
-		return nil, err
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "INSERT INTO users (id, username, role) VALUES (?, ?, 'user')", id[:], username)
+	if duplicate(err) {
+		return wire.E("CONFLICT", false)
+	}
+	if err != nil {
+		return err
+	}
+	if err := recordAudit(ctx, tx, actor[:], "account.create", id[:], nil); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) inviteAccount(ctx context.Context, actor wire.ID, username string, ttl time.Duration) (issuedInvite, error) {
+	tx, err := beginAdmin(ctx, s.DB, actor)
+	if err != nil {
+		return issuedInvite{}, err
+	}
+	defer tx.Rollback()
+	target, err := lockUsername(ctx, tx, username)
+	if err != nil {
+		return issuedInvite{}, err
 	}
 	if target.role != "user" || !target.enabled {
-		return nil, wire.E("DENIED", false)
+		return issuedInvite{}, wire.E("DENIED", false)
 	}
-	token, err := issueInvite(ctx, tx, target.id)
+	invite, err := issueInvite(ctx, tx, target.id, ttl)
 	if err != nil {
-		return nil, err
+		return issuedInvite{}, err
 	}
-	if err := recordAudit(ctx, tx, actor[:], "invite.issue", target.id[:], nil); err != nil {
-		return nil, err
+	if err := recordAudit(ctx, tx, actor[:], "invite.issue", target.id[:], map[string]string{
+		"ttlMinutes": strconv.Itoa(int(ttl / time.Minute)),
+	}); err != nil {
+		return issuedInvite{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return issuedInvite{}, err
 	}
-	return struct {
-		Token string `json:"inviteToken"`
-	}{token}, nil
+	return invite, nil
 }
 
 func (s *Store) setAccess(ctx context.Context, actor wire.ID, request accessRequest) error {
